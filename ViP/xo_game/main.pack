@@ -1,0 +1,19 @@
+﻿% own pack
+#include @"main.ph"
+
+% privately used packages
+#include @"pfc\string\string.ph"
+#include @"pfc\std\std.ph"
+#include @"pfc\math\math.ph"
+#include @"pfc\list\list.ph"
+#include @"MainForm\MainForm.ph"
+#include @"pfc\gui\gui.ph"
+#include @"pfc\gui\messageLoop\messageLoop.ph"
+
+% private interfaces
+
+% private classes
+
+% implementations
+#include @"main.pro"
+

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<settings>
+	<listeningPort>16500</listeningPort>
+	<listeningPortPinpad>20500</listeningPortPinpad>
+	<PrinterWD>40</PrinterWD>
+	<PaperCut>12</PaperCut>
+	<T1>10</T1>
+	<T2>30</T2>
+	<T3>90</T3>
+	<log_size>5</log_size>
+	<log_count>30</log_count>
+	<T1_repeat>3</T1_repeat>
+       	<reslt_msg>1</reslt_msg>
+	<noprint>0</noprint>
+	<UsePDS>1</UsePDS>
+	<print_rcpt_tt>0</print_rcpt_tt>
+	<currencies>
+	  <currency alpha=”BYR”>974</currency>
+	  <currency alpha=”USD” dp=”2”>840</currency>
+	</currencies>
+<Debuglevel>5</Debuglevel>
+</settings>

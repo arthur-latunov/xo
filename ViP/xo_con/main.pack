@@ -1,0 +1,20 @@
+﻿#include @"main.ph"
+
+% privately used packages
+#include @"pfc\application\Exe\exe.ph"
+#include @"pfc\collection\M\varM\varM.ph"
+#include @"pfc\profile\performanceCounter\performanceCounter.ph"
+#include @"pfc\string\string.ph"
+#include @"pfc\math\math.ph"
+#include @"pfc\std\std.ph"
+#include @"pfc\list\list.ph"
+#include @"pfc\console\console.ph"
+#include @"pfc\core.ph"
+
+% private interfaces
+
+% private classes
+
+% implementations
+#include @"main.pro"
+
