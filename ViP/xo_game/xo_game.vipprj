@@ -158,15 +158,25 @@
     <item-map filename="MainForm\bmp\nm.bmp" resource_id="bmp_nm" />
     <item-map filename="MainForm\bmp\ny.bmp" resource_id="bmp_ny" />
     <item-map filename="MainForm\bmp\o.bmp" resource_id="bmp_o" />
+    <item-map filename="MainForm\bmp\o1.bmp" resource_id="bmp_o1" />
     <item-map filename="MainForm\bmp\oc.bmp" resource_id="bmp_oc" />
+    <item-map filename="MainForm\bmp\oc1.bmp" resource_id="bmp_oc1" />
     <item-map filename="MainForm\bmp\og.bmp" resource_id="bmp_og" />
+    <item-map filename="MainForm\bmp\og1.bmp" resource_id="bmp_og1" />
     <item-map filename="MainForm\bmp\om.bmp" resource_id="bmp_om" />
+    <item-map filename="MainForm\bmp\om1.bmp" resource_id="bmp_om1" />
     <item-map filename="MainForm\bmp\oy.bmp" resource_id="bmp_oy" />
+    <item-map filename="MainForm\bmp\oy1.bmp" resource_id="bmp_oy1" />
     <item-map filename="MainForm\bmp\x.bmp" resource_id="bmp_x" />
+    <item-map filename="MainForm\bmp\x1.bmp" resource_id="bmp_x1" />
     <item-map filename="MainForm\bmp\xc.bmp" resource_id="bmp_xc" />
+    <item-map filename="MainForm\bmp\xc1.bmp" resource_id="bmp_xc1" />
     <item-map filename="MainForm\bmp\xg.bmp" resource_id="bmp_xg" />
+    <item-map filename="MainForm\bmp\xg1.bmp" resource_id="bmp_xg1" />
     <item-map filename="MainForm\bmp\xm.bmp" resource_id="bmp_xm" />
+    <item-map filename="MainForm\bmp\xm1.bmp" resource_id="bmp_xm1" />
     <item-map filename="MainForm\bmp\xy.bmp" resource_id="bmp_xy" />
+    <item-map filename="MainForm\bmp\xy1.bmp" resource_id="bmp_xy1" />
     <item-map filename="MainForm\bmp\z.bmp" resource_id="bmp_z" />
     <item-map filename="MainForm\bmp\zb.bmp" resource_id="bmp_zb" />
     <item-map filename="MainForm\bmp\zc.bmp" resource_id="bmp_zc" />

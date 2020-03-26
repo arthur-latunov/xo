@@ -98,7 +98,6 @@ xo_set_size(PosBegin, PosEnd) :-
     assertz( xo_params([size(PosBegin, PosEnd) | Params1]) ),
     !.
 
-
 % взять уровни из параметров игры
 % xo_get_levels(NormalLevel, EchoLevel)
 xo_get_levels(NormalLevel, EchoLevel) :-
@@ -161,6 +160,10 @@ select_param(Elem, [Head | Tail], [Head | Rest]) :-
 
 xo_step_once(Mark, Step, Coor) :-
     xo_step(Mark, Step, Coor),
+    !.
+
+xo_step_back_once(Mark, Step, Coor) :-
+    xo_step_back(Mark, Step, Coor),
     !.
 
 domains
@@ -815,6 +818,29 @@ xo_unmark_cell(Cell) :-
     asserta( xo_cell(Coor, n) ),
     retract( xo_step(_Mark, _Step, Coor) ),
     !.
+
+% шаг назад
+% xo_back()
+xo_back() :-
+    xo_step(Mark, Step, Coor),
+    Cell = cell(Coor, Mark),
+    xo_unmark_cell(Cell),
+    asserta( xo_step_back(Mark, Step, Coor) ),
+    !.
+
+% шаг вперед
+% xo_forth()
+xo_forth() :-
+    retract( xo_step_back(Mark, _Step, Coor) ),
+    xo_params(Params),
+    go(MarkX, _MarkO) in Params,
+    if Mark = MarkX then Mode = normal else Mode = echo end if,
+    Cell = cell(Coor, n),
+    xo_mark_cell(Mode, Cell),
+    !.
+
+xo_forth_clear() :-
+    retractall( xo_step_back(_, _, _) ).
 
 % смена состояния для решения
 % xo_change_solve(Solve, Cell, Mark, ChangedSolve, State, ChangedState, ChangedHasChanceMark)

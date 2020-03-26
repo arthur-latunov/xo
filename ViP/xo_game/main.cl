@@ -26,8 +26,11 @@ xo_get_levels : (integer [out], integer [out]).
 xo_set_levels : (integer, integer) determ.
 xo_get_cell : (coor Coor, symbol Mark) nondeterm (o,o) (i,o) (i,i).
 xo_step_once : (symbol Mark, integer Step, coor Coor) determ (i,o,o) (o,o,o).
-xo_play_once :
-    (symbol Mode, cell PlayCell, symbol RuleName, string Rule) determ (i,o,o,o).
+xo_step_back_once : (symbol Mark, integer Step, coor Coor) determ (i,o,o) (o,o,o).
+xo_play_once : (symbol Mode, cell PlayCell, symbol RuleName, string Rule) determ (i,o,o,o).
+xo_back : () determ.
+xo_forth : () determ.
+xo_forth_clear : ().
 xo_mark_cell : (symbol Mode, cell Cell) determ.
 xo_unmark_cell : (cell Cell) determ.
 xo_win : (cell* Solve [out]) determ.

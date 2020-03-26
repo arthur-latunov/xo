@@ -27,33 +27,38 @@ app_name : string = "Крестики-нолики (пять в ряд)".
 app_font_name : string = "Verdana".
 game_levels : string* = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].
 
+domains
+pics = picture*.
+
 facts
 win_gdi : windowGDI := getWindowGDI().
 hwnd : windowHandle := winGetActiveWindow().
-pic_n : picture := pictGetFromRes(bmp_n).
-pic_x : picture := pictGetFromRes(bmp_x).
-pic_o : picture := pictGetFromRes(bmp_o).
-pic_z : picture := pictGetFromRes(bmp_z).
-pic_nc : picture := pictGetFromRes(bmp_nc).
-pic_xc : picture := pictGetFromRes(bmp_xc).
-pic_oc : picture := pictGetFromRes(bmp_oc).
-pic_zc : picture := pictGetFromRes(bmp_zc).
-pic_ng : picture := pictGetFromRes(bmp_ng).
-pic_xg : picture := pictGetFromRes(bmp_xg).
-pic_og : picture := pictGetFromRes(bmp_og).
-pic_zg : picture := pictGetFromRes(bmp_zg).
-pic_ny : picture := pictGetFromRes(bmp_ny).
-pic_xy : picture := pictGetFromRes(bmp_xy).
-pic_oy : picture := pictGetFromRes(bmp_oy).
-pic_zy : picture := pictGetFromRes(bmp_zy).
+pic_shape : integer := 0.
+max_pic_shape : integer := 1.
+pic_n : pics  := [pictGetFromRes(bmp_n), pictGetFromRes(bmp_n)].
+pic_x : pics  := [pictGetFromRes(bmp_x), pictGetFromRes(bmp_x1)].
+pic_o : pics  := [pictGetFromRes(bmp_o), pictGetFromRes(bmp_o1)].
+pic_z : pics  := [pictGetFromRes(bmp_z), pictGetFromRes(bmp_z)].
+pic_nc : pics := [pictGetFromRes(bmp_nc), pictGetFromRes(bmp_nc)].
+pic_xc : pics := [pictGetFromRes(bmp_xc), pictGetFromRes(bmp_xc1)].
+pic_oc : pics := [pictGetFromRes(bmp_oc), pictGetFromRes(bmp_oc1)].
+pic_zc : pics := [pictGetFromRes(bmp_zc), pictGetFromRes(bmp_zc)].
+pic_ng : pics := [pictGetFromRes(bmp_ng), pictGetFromRes(bmp_ng)].
+pic_xg : pics := [pictGetFromRes(bmp_xg), pictGetFromRes(bmp_xg1)].
+pic_og : pics := [pictGetFromRes(bmp_og), pictGetFromRes(bmp_og1)].
+pic_zg : pics := [pictGetFromRes(bmp_zg), pictGetFromRes(bmp_zg)].
+pic_ny : pics := [pictGetFromRes(bmp_ny), pictGetFromRes(bmp_ny)].
+pic_xy : pics := [pictGetFromRes(bmp_xy), pictGetFromRes(bmp_xy1)].
+pic_oy : pics := [pictGetFromRes(bmp_oy), pictGetFromRes(bmp_oy1)].
+pic_zy : pics := [pictGetFromRes(bmp_zy), pictGetFromRes(bmp_zy)].
+pic_nm : pics := [pictGetFromRes(bmp_nm), pictGetFromRes(bmp_nm)].
+pic_xm : pics := [pictGetFromRes(bmp_xm), pictGetFromRes(bmp_xm1)].
+pic_om : pics := [pictGetFromRes(bmp_om), pictGetFromRes(bmp_om1)].
+pic_zm : pics := [pictGetFromRes(bmp_zm), pictGetFromRes(bmp_zm)].
 /*
-pic_nm : picture := pictGetFromRes(bmp_nm).
-pic_xm : picture := pictGetFromRes(bmp_xm).
-pic_om : picture := pictGetFromRes(bmp_om).
-pic_zm : picture := pictGetFromRes(bmp_zm).
-pic_zd : picture := pictGetFromRes(bmp_zd).
-pic_zr : picture := pictGetFromRes(bmp_zr).
-pic_zb : picture := pictGetFromRes(bmp_zb).
+pic_zd : pics := [pictGetFromRes(bmp_zd), pictGetFromRes(bmp_zd)].
+pic_zr : pics := [pictGetFromRes(bmp_zr), pictGetFromRes(bmp_zb)].
+pic_zb : pics := [pictGetFromRes(bmp_zb), pictGetFromRes(bmp_zr)].
 */
 
 facts
@@ -102,10 +107,6 @@ win_init() :-
     %winSetBackColor(hwnd, color_WhiteSmoke),
     %winClear(hwnd, color_WhiteSmoke),
     setText(app_name),
-    home_pushButton_ctl:setVisible(false),
-    back_pushButton_ctl:setVisible(false),
-    force_pushButton_ctl:setVisible(false),
-    end_pushButton_ctl:setVisible(false),
     info_StaticText_ctl:setVisible(false),
     gameOpt_ctl:setFont(win_small_font),
     x_listButton_ctl:addList(game_levels),
@@ -114,7 +115,7 @@ win_init() :-
     stop_pushButton_ctl:setFont(win_bold_font),
     home_pushButton_ctl:setFont(win_bold_font),
     back_pushButton_ctl:setFont(win_bold_font),
-    force_pushButton_ctl:setFont(win_bold_font),
+    forth_pushButton_ctl:setFont(win_bold_font),
     end_pushButton_ctl:setFont(win_bold_font),
     icon_ctl:addMouseDblListener(onIconMouseDbl),
     %
@@ -140,6 +141,8 @@ win_init() :-
     xo_get_levels(NormalLevel, EchoLevel),
     x_listButton_ctl:selectAt(NormalLevel-1, true),
     o_listButton_ctl:selectAt(EchoLevel-1, true),
+    %
+    move_set_state(),
     !.
 
 predicates
@@ -185,7 +188,7 @@ fill_cells(Flips, SmallPic) :-
                 N = math::random(3),
                 Xf = field_left + (I + pos_offset - 1) * cell_size + 4,
                 Yf = field_top + (J + pos_offset - 1) * cell_size + 4,
-                PicFlash = list::nth(N, [pic_z, pic_x, pic_o]),
+                PicFlash = list::nth(pic_shape, list::nth(N, [pic_z, pic_x, pic_o])),
                 win_gdi:pictDraw(PicFlash, pnt(Xf, Yf), rop_SrcCopy)
             end if
         end foreach,
@@ -195,11 +198,12 @@ fill_cells(Flips, SmallPic) :-
     end foreach,
     !.
 
-facts
-cell_space : integer := 0.
-cell_flash : integer := 1.
-cell_force : integer := 2.
-cell_back : integer := 3.
+constants
+cell_space : integer = 0.
+cell_flash : integer = 1.
+cell_forth : integer = 2.
+cell_back : integer = 3.
+cell_claim : integer = 4.
 
 predicates
 draw_cell : (integer I, integer J, integer Attr, integer SmallPic).
@@ -208,21 +212,25 @@ clauses
 draw_cell(I, J, Attr, SmallPic) :-
     X = field_left + (I + pos_offset - 1) * cell_size,
     Y = field_top + (J + pos_offset - 1) * cell_size,
-    tuple(Attr, SmallPic, PicField) in
+    tuple(Attr, SmallPic, ListPicField) in
         [ tuple(cell_space, 0, pic_n),  tuple(cell_space, 1, pic_z),
           tuple(cell_flash, 0, pic_ny), tuple(cell_flash, 1, pic_zy),
-          tuple(cell_force, 0, pic_ng), tuple(cell_force, 1, pic_zg),
-          tuple(cell_back, 0, pic_nc), tuple(cell_back, 1, pic_zc)
+          tuple(cell_forth, 0, pic_ng), tuple(cell_forth, 1, pic_zg),
+          tuple(cell_back, 0, pic_nc), tuple(cell_back, 1, pic_zc),
+          tuple(cell_claim, 0, pic_nm), tuple(cell_claim, 1, pic_zm)
         ],
+    PicField = list::nth(pic_shape, ListPicField),
     win_gdi:pictDraw(PicField, pnt(X+4*SmallPic, Y+4*SmallPic), rop_SrcCopy),
     %
     xo_get_cell(coor(I, J), Mark),
-    tuple(Mark, Attr, PicMark) in
-        [ tuple(x, cell_space, pic_x),  tuple(o, cell_space, pic_o),
+    tuple(Mark, Attr, ListPicMark) in
+        [ tuple(x, cell_space, pic_x), tuple(o, cell_space, pic_o),
           tuple(x, cell_flash, pic_xy), tuple(o, cell_flash, pic_oy),
-          tuple(x, cell_force, pic_xg), tuple(o, cell_force, pic_og),
-          tuple(x, cell_back, pic_xc), tuple(o, cell_back, pic_oc)
+          tuple(x, cell_forth, pic_xg), tuple(o, cell_forth, pic_og),
+          tuple(x, cell_back, pic_xc), tuple(o, cell_back, pic_oc),
+          tuple(x, cell_claim, pic_xm), tuple(o, cell_claim, pic_om)
         ],
+    PicMark = list::nth(pic_shape, ListPicMark),
     win_gdi:pictDraw(PicMark, pnt(X+4, Y+4), rop_SrcCopy),
     !.
 draw_cell(_I, _J, _Attr, _SmallPic).
@@ -236,6 +244,7 @@ clauses
         play_pushButton_ctl:setEnabled(false),
         stop_pushButton_ctl:setEnabled(),
         xo_init(),
+        move_set_state(),
         fill_cells([1], 1),
         play_loop(),
         !.
@@ -245,6 +254,7 @@ clauses
         stop_pushButton_ctl:setEnabled(false),
         play_pushButton_ctl:setEnabled(),
         xo_clear(),
+        move_set_state(),
         fill_cells([1], 1),
         !.
 
@@ -306,6 +316,8 @@ play_auto(Mark) :-
     tuple(Mark, Mode) in [tuple(o, normal), tuple(x, echo)],
     xo_play_once(Mode, PlayCell, _RuleName, _Rule),
     xo_mark_cell(Mode, PlayCell),
+    xo_forth_clear(),
+    move_set_state(),
     PlayCell = cell(coor(I, J), _),
     draw_cell(I, J, cell_flash, 1),
     programControl::sleep(250),
@@ -318,7 +330,7 @@ play_end(DrawSolve) :-
         foreach
             cell(coor(I, J), _) in Solve
         do
-            draw_cell(I, J, cell_force, 1),
+            draw_cell(I, J, cell_forth, 1),
             programControl::sleep(100)
         end foreach,
         programControl::sleep(1000),
@@ -343,6 +355,15 @@ clauses
         user_turn(X, Y),
         !.
     onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
+        Point = pnt(X, Y),
+        X = std::between(field_left, field_right),
+        Y = std::between(field_top, field_bottom),
+        Button = 1,
+        pic_shape := pic_shape + 1,
+        if pic_shape > max_pic_shape then pic_shape := 0 end if,
+        fill_cells([1], 1),
+        !.
+    onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
         xo_cell_exists(),
         Point = pnt(X, Y),
         X = std::between(box_left, box_right),
@@ -350,7 +371,77 @@ clauses
         Button = 0,
         last_turn(),
         !.
-    onMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+    onMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
+        moveInProcess := 0.
+
+facts
+moveInProcess : integer := 0.
+
+predicates
+turn_home : (positive Ms) determ.
+turn_back : (positive Ms) determ.
+turn_forth : (positive Ms) determ.
+turn_end : (positive Ms) determ.
+
+clauses
+turn_home(Ms) :-
+    moveInProcess = 1,
+    turn_back(Ms),
+    _IsSuccessful = vpi::processEvents(),
+    !,
+    turn_home(Ms).
+turn_home(_).
+
+turn_back(Ms) :-
+    xo_step_once(_Mark, _Step, Coor),
+    Coor = coor(I, J),
+    draw_cell(I, J, cell_back, 1),
+    programControl::sleep(Ms),
+    draw_cell(I, J, cell_space, 1),
+    xo_back(),
+    draw_cell(I, J, cell_back, 1),
+    programControl::sleep(Ms),
+    draw_cell(I, J, cell_space, 1),
+    move_set_state(),
+    !.
+
+turn_forth(Ms) :-
+    xo_step_back_once(_Mark, _Step, Coor),
+    Coor = coor(I, J),
+    draw_cell(I, J, cell_forth, 1),
+    programControl::sleep(Ms),
+    draw_cell(I, J, cell_space, 1),
+    xo_forth(),
+    draw_cell(I, J, cell_forth, 1),
+    programControl::sleep(Ms),
+    draw_cell(I, J, cell_space, 1),
+    move_set_state(),
+    !.
+
+turn_end(Ms) :-
+    moveInProcess = 1,
+    turn_forth(Ms),
+    _IsSuccessful = vpi::processEvents(),
+    !,
+    turn_end(Ms).
+turn_end(_) :-
+    moveInProcess = 1,
+    last_turn(),
+    !.
+turn_end(_).
+
+predicates
+move_set_state : ().
+
+clauses
+move_set_state() :-
+    if xo_step_once(_, _, _) then StateBack = true else StateBack = false end if,
+    if xo_step_back_once(_, _, _) then StateForth = true else StateForth = false end if,
+    home_pushButton_ctl:setEnabled(StateBack),
+    back_pushButton_ctl:setEnabled(StateBack),
+    forth_pushButton_ctl:setEnabled(StateForth),
+    end_pushButton_ctl:setEnabled(StateForth),
+    !.
 
 predicates
 user_turn : (integer X, integer Y) determ.
@@ -368,6 +459,8 @@ user_turn(X, Y) :-
     tuple(Mark, Mode) in [tuple(o, normal), tuple(x, echo)],
     PlayCell = cell(Coor, n),
     xo_mark_cell(Mode, PlayCell),
+    xo_forth_clear(),
+    move_set_state(),
     draw_cell(I, J, cell_flash, 1),
     programControl::sleep(250),
     draw_cell(I, J, cell_space, 1),
@@ -458,11 +551,11 @@ facts
     coor_pic_i : (integer I, integer State, picture Picture).
     coor_pic_j : (integer J, integer State, picture Picture).
 predicates
-    draw_coor : (integer I, integer J, integer State, integer Force) procedure.
+    draw_coor : (integer I, integer J, integer State, integer Forth) procedure.
     draw_coor_desk : (integer I, integer J, integer Visible) procedure.
 clauses
-    draw_coor(I, J, State, Force) :-
-        if xo_cell_exists() or Force = 1 then succeed else fail end if,
+    draw_coor(I, J, State, Forth) :-
+        if xo_cell_exists() or Forth = 1 then succeed else fail end if,
         I = std::between(pos_begin, pos_end),
         J = std::between(pos_begin, pos_end),
         tuple(State, SignFont) in [tuple(coor_norm, win_small_font), tuple(coor_sign, win_small_bold_font)],
@@ -502,7 +595,7 @@ clauses
             coor_j_state := State
         end if,
         !.
-    draw_coor(_I, _J, _State, _Force).
+    draw_coor(_I, _J, _State, _Forth).
 
 draw_coor_desk(I, J, Visible) :-
     xo_cell_exists(),
@@ -526,8 +619,56 @@ draw_coor_desk(_I, _J, _Visible) :-
     win_gdi:drawRect(rct(Left, Top, Right, Bottom)),
     !.
 
+predicates
+    onBack_pushButtonMouseDown : window::mouseDownListener.
+clauses
+    onBack_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        Button = 0,
+        tuple(ShiftControlAlt, Ms) in
+            [tuple(0, 125), tuple(1, 0)],
+        turn_back(Ms),
+        !.
+    onBack_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+
+predicates
+    onForth_pushButtonMouseDown : window::mouseDownListener.
+clauses
+    onForth_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        Button = 0,
+        tuple(ShiftControlAlt, Ms) in
+            [tuple(0, 125), tuple(1, 0)],
+        turn_forth(Ms),
+        !.
+    onForth_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+
+predicates
+    onHome_pushButtonMouseDown : window::mouseDownListener.
+clauses
+    onHome_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        Button = 0,
+        tuple(ShiftControlAlt, Ms) in
+            [tuple(0, 125), tuple(1, 0)],
+        moveInProcess := 1,
+        turn_home(Ms),
+        moveInProcess := 0,
+        !.
+    onHome_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+
+predicates
+    onEnd_pushButtonMouseDown : window::mouseDownListener.
+clauses
+    onEnd_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        Button = 0,
+        tuple(ShiftControlAlt, Ms) in
+            [tuple(0, 125), tuple(1, 0)],
+        moveInProcess := 1,
+        turn_end(Ms),
+        moveInProcess := 0,
+        !.
+    onEnd_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+
 % This code is maintained automatically, do not update it manually.
-%  14:13:58-10.3.2020
+%  16:44:37-24.3.2020
 
 facts
     gameOpt_ctl : groupBox.
@@ -546,7 +687,7 @@ facts
     y_Coor_ctl : textControl.
     home_pushButton_ctl : button.
     back_pushButton_ctl : button.
-    force_pushButton_ctl : button.
+    forth_pushButton_ctl : button.
     end_pushButton_ctl : button.
     info_StaticText_ctl : textControl.
 
@@ -627,14 +768,14 @@ clauses
         play_pushButton_ctl := button::new(This),
         play_pushButton_ctl:setText("Старт"),
         play_pushButton_ctl:setPosition(170, 5),
-        play_pushButton_ctl:setWidth(33),
+        play_pushButton_ctl:setWidth(32),
         play_pushButton_ctl:defaultHeight := true,
         play_pushButton_ctl:setAnchors([]),
         play_pushButton_ctl:setClickResponder(onPlay_pushButtonClick),
         stop_pushButton_ctl := button::new(This),
         stop_pushButton_ctl:setText("Стоп"),
         stop_pushButton_ctl:setPosition(203, 5),
-        stop_pushButton_ctl:setWidth(33),
+        stop_pushButton_ctl:setWidth(32),
         stop_pushButton_ctl:defaultHeight := true,
         stop_pushButton_ctl:setAnchors([]),
         stop_pushButton_ctl:setEnabled(false),
@@ -654,31 +795,31 @@ clauses
         home_pushButton_ctl := button::new(This),
         home_pushButton_ctl:setText("|<"),
         home_pushButton_ctl:setPosition(170, 21),
-        home_pushButton_ctl:setWidth(17),
-        home_pushButton_ctl:defaultHeight := true,
+        home_pushButton_ctl:setSize(16, 12),
+        home_pushButton_ctl:defaultHeight := false,
         home_pushButton_ctl:setAnchors([]),
-        home_pushButton_ctl:setEnabled(false),
+        home_pushButton_ctl:addMouseDownListener(onHome_pushButtonMouseDown),
         back_pushButton_ctl := button::new(This),
         back_pushButton_ctl:setText("<"),
-        back_pushButton_ctl:setPosition(187, 20),
+        back_pushButton_ctl:setPosition(186, 21),
         back_pushButton_ctl:setSize(16, 12),
         back_pushButton_ctl:defaultHeight := false,
         back_pushButton_ctl:setAnchors([]),
-        back_pushButton_ctl:setEnabled(false),
-        force_pushButton_ctl := button::new(This),
-        force_pushButton_ctl:setText(">"),
-        force_pushButton_ctl:setPosition(203, 21),
-        force_pushButton_ctl:setSize(16, 12),
-        force_pushButton_ctl:defaultHeight := false,
-        force_pushButton_ctl:setAnchors([]),
-        force_pushButton_ctl:setEnabled(false),
+        back_pushButton_ctl:addMouseDownListener(onBack_pushButtonMouseDown),
+        forth_pushButton_ctl := button::new(This),
+        forth_pushButton_ctl:setText(">"),
+        forth_pushButton_ctl:setPosition(203, 21),
+        forth_pushButton_ctl:setSize(16, 12),
+        forth_pushButton_ctl:defaultHeight := false,
+        forth_pushButton_ctl:setAnchors([]),
+        forth_pushButton_ctl:addMouseDownListener(onForth_pushButtonMouseDown),
         end_pushButton_ctl := button::new(This),
         end_pushButton_ctl:setText(">|"),
         end_pushButton_ctl:setPosition(219, 21),
-        end_pushButton_ctl:setSize(17, 12),
+        end_pushButton_ctl:setSize(16, 12),
         end_pushButton_ctl:defaultHeight := false,
         end_pushButton_ctl:setAnchors([]),
-        end_pushButton_ctl:setEnabled(false),
+        end_pushButton_ctl:addMouseDownListener(onEnd_pushButtonMouseDown),
         info_StaticText_ctl := textControl::new(This),
         info_StaticText_ctl:setText("Hовая игра"),
         info_StaticText_ctl:setPosition(171, 37),
