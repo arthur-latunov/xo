@@ -387,6 +387,9 @@ clauses
 turn_home(Ms) :-
     moveInProcess = 1,
     turn_back(Ms),
+    fail.
+turn_home(Ms) :-
+    moveInProcess = 1,
     _IsSuccessful = vpi::processEvents(),
     !,
     turn_home(Ms).
@@ -421,13 +424,18 @@ turn_forth(Ms) :-
 turn_end(Ms) :-
     moveInProcess = 1,
     turn_forth(Ms),
+    fail.
+turn_end(_) :-
+    moveInProcess = 1,
+    play_end(0),
+    last_turn(),
+    fail.
+turn_end(Ms) :-
+    moveInProcess = 1,
+    not( play_end(0) ),
     _IsSuccessful = vpi::processEvents(),
     !,
     turn_end(Ms).
-turn_end(_) :-
-    moveInProcess = 1,
-    last_turn(),
-    !.
 turn_end(_).
 
 predicates
@@ -626,6 +634,7 @@ clauses
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
+        moveInProcess := 0,
         turn_back(Ms),
         !.
     onBack_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
@@ -637,6 +646,7 @@ clauses
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
+        moveInProcess := 0,
         turn_forth(Ms),
         !.
     onForth_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
