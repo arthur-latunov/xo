@@ -164,11 +164,13 @@ fill_cells : (integer* Flips, integer SmallPic).
 
 clauses
 fill_cells(Flips, SmallPic) :-
-    rct(Li, Ti, Ri, Bi) = info_StaticText_ctl:getOuterRect(),
-    win_gdi:drawRect(rct(Li-1, Ti-3, Ri+1, Bi+1)),
     win_gdi:setPen(pen(1, ps_Solid, color_Gray)),
     win_gdi:setBrush(brush(pat_Solid, color_WhiteSmoke)),
     win_gdi:drawRect(rct(box_left, box_top, box_right, box_bottom)),
+    if info_StaticText_ctl:getVisible() = true then
+        rct(Li, Ti, Ri, Bi) = info_StaticText_ctl:getOuterRect(),
+        win_gdi:drawRect(rct(Li-1, Ti-3, Ri+1, Bi+1))
+    end if,
     foreach
         Flip in Flips
     do
@@ -246,6 +248,7 @@ clauses
         xo_init(),
         move_set_state(),
         fill_cells([1], 1),
+        playInProcess := 1,
         play_loop(),
         !.
     onPlay_pushButtonClick(_Source) = button::defaultAction.
@@ -257,6 +260,9 @@ clauses
         move_set_state(),
         fill_cells([1], 1),
         !.
+
+facts
+playInProcess : integer := 0.
 
 constants
 comp_play : integer = 1.
@@ -297,19 +303,29 @@ play_check_(user_play, o) :-
     !.
 
 play_loop() :-
+    moveInProcess = 0,
+    playInProcess = 1,
     xo_cell_exists(),
     not( play_end(0) ),
     play_check(comp_play, Mark),
     play_auto(Mark),
     play_end(1),
+    playInProcess := 0,
     !.
 play_loop() :-
+    moveInProcess = 0,
+    playInProcess = 1,
     xo_cell_exists(),
     not( play_end(0) ),
     play_check(comp_play, _Mark),
     _IsSuccessful = vpi::processEvents(),
     !,
     play_loop().
+play_loop() :-
+    moveInProcess = 0,
+    playInProcess = 1,
+    playInProcess := 0,
+    !.
 play_loop().
 
 play_auto(Mark) :-
@@ -347,6 +363,8 @@ predicates
     onMouseDown : window::mouseDownListener.
 clauses
     onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         xo_cell_exists(),
         Point = pnt(X, Y),
         X = std::between(field_left, field_right),
@@ -355,6 +373,8 @@ clauses
         user_turn(X, Y),
         !.
     onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         Point = pnt(X, Y),
         X = std::between(field_left, field_right),
         Y = std::between(field_top, field_bottom),
@@ -364,6 +384,8 @@ clauses
         fill_cells([1], 1),
         !.
     onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         xo_cell_exists(),
         Point = pnt(X, Y),
         X = std::between(box_left, box_right),
@@ -371,8 +393,21 @@ clauses
         Button = 0,
         last_turn(),
         !.
+    onMouseDown(_Source, Point, _ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
+        xo_cell_exists(),
+        Point = pnt(X, Y),
+        X = std::between(box_left, box_right),
+        Y = std::between(box_top, box_bottom),
+        Button = 1,
+        turn_advice(),
+        !.
     onMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
-        moveInProcess := 0.
+        moveInProcess = 1,
+        moveInProcess := 0,
+        !.
+    onMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
 facts
 moveInProcess : integer := 0.
@@ -387,13 +422,13 @@ clauses
 turn_home(Ms) :-
     moveInProcess = 1,
     turn_back(Ms),
-    fail.
-turn_home(Ms) :-
-    moveInProcess = 1,
     _IsSuccessful = vpi::processEvents(),
     !,
     turn_home(Ms).
-turn_home(_).
+turn_home(_) :-
+    moveInProcess = 1,
+    moveInProcess := 0,
+    !.
 
 turn_back(Ms) :-
     xo_step_once(_Mark, _Step, Coor),
@@ -419,24 +454,19 @@ turn_forth(Ms) :-
     programControl::sleep(Ms),
     draw_cell(I, J, cell_space, 1),
     move_set_state(),
+    ( play_end(0), last_turn() ; succeed ),
     !.
 
 turn_end(Ms) :-
     moveInProcess = 1,
     turn_forth(Ms),
-    fail.
-turn_end(_) :-
-    moveInProcess = 1,
-    play_end(0),
-    last_turn(),
-    fail.
-turn_end(Ms) :-
-    moveInProcess = 1,
-    not( play_end(0) ),
     _IsSuccessful = vpi::processEvents(),
     !,
     turn_end(Ms).
-turn_end(_).
+turn_end(_) :-
+    moveInProcess = 1,
+    moveInProcess := 0,
+    !.
 
 predicates
 move_set_state : ().
@@ -478,7 +508,7 @@ user_turn(_X, _Y) :-
     xo_cell_exists(),
     not( play_end(0) ),
     play_check(comp_play, _Mark),
-    _IsSuccessful = vpi::processEvents(),
+    playInProcess := 1,
     !,
     play_loop().
 user_turn(_X, _Y).
@@ -505,6 +535,33 @@ last_turn() :-
     play_end(1),
     !.
 last_turn().
+
+predicates
+turn_advice : () determ.
+
+clauses
+turn_advice() :-
+    win_gdi:setPen(pen(1, ps_Solid, color_Gray)),
+    win_gdi:setBrush(brush(pat_Solid, color_lightPink)),
+    win_gdi:drawRect(rct(box_left, box_top, box_right, box_bottom)),
+    programControl::sleep(250),
+    win_gdi:setBrush(brush(pat_Solid, color_WhiteSmoke)),
+    win_gdi:drawRect(rct(box_left, box_top, box_right, box_bottom)),
+    %
+    (xo_step_once(Mark, _Step, _Coor) ; Mark = o ),
+    tuple(Mark, Mode) in [tuple(o, normal), tuple(x, echo)],
+    xo_play_once(Mode, PlayCell, _RuleName, _Rule),
+    PlayCell = cell(coor(I, J), _),
+    %
+    foreach
+        _Loop = std::cIterate(3)
+    do
+        draw_cell(I, J, cell_claim, 1),
+        programControl::sleep(125),
+        draw_cell(I, J, cell_space, 1),
+        programControl::sleep(125)
+    end foreach,
+    !.
 
 predicates
     onX_listButtonSelectionChanged : listControl::selectionChangedListener.
@@ -631,11 +688,16 @@ predicates
     onBack_pushButtonMouseDown : window::mouseDownListener.
 clauses
     onBack_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
-        moveInProcess := 0,
         turn_back(Ms),
+        !.
+    onBack_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
+        moveInProcess = 1,
+        moveInProcess := 0,
         !.
     onBack_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
@@ -643,11 +705,16 @@ predicates
     onForth_pushButtonMouseDown : window::mouseDownListener.
 clauses
     onForth_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
-        moveInProcess := 0,
         turn_forth(Ms),
+        !.
+    onForth_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
+        moveInProcess = 1,
+        moveInProcess := 0,
         !.
     onForth_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
@@ -655,11 +722,16 @@ predicates
     onHome_pushButtonMouseDown : window::mouseDownListener.
 clauses
     onHome_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
         moveInProcess := 1,
         turn_home(Ms),
+        !.
+    onHome_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
+        moveInProcess = 1,
         moveInProcess := 0,
         !.
     onHome_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
@@ -668,17 +740,22 @@ predicates
     onEnd_pushButtonMouseDown : window::mouseDownListener.
 clauses
     onEnd_pushButtonMouseDown(_Source, _Point, ShiftControlAlt, Button) :-
+        moveInProcess = 0,
+        playInProcess = 0,
         Button = 0,
         tuple(ShiftControlAlt, Ms) in
             [tuple(0, 125), tuple(1, 0)],
         moveInProcess := 1,
         turn_end(Ms),
+        !.
+    onEnd_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button) :-
+        moveInProcess = 1,
         moveInProcess := 0,
         !.
     onEnd_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
 % This code is maintained automatically, do not update it manually.
-%  16:44:37-24.3.2020
+%  14:16:31-8.4.2020
 
 facts
     gameOpt_ctl : groupBox.
