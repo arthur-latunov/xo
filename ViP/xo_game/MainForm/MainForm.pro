@@ -1,7 +1,7 @@
 ﻿% Copyright AR
 
 implement mainForm inherits formWindow
-    open core, vpiDomains, vpi, resourceIdentifiers, main
+    open core, vpiDomains, vpi, resourceIdentifiers, main, list
 
 clauses
     display(Parent) = Form :-
@@ -18,14 +18,37 @@ clauses
 
 predicates
     onIconMouseDbl : window::mouseDblListener.
+    onIconMouseDown : window::mouseDownListener.
 clauses
     onIconMouseDbl(Source, _Point, _ShiftControlAlt, _Button) :-
         _AboutDialog = aboutDialog::display(Source).
 
+    onIconMouseDown(_Source, _Point, _ShiftControlAlt, Button) :-
+        Button = 1,
+        lang := lang + 1,
+        if lang > max_lang then lang := 0 end if,
+        set_lang(),
+        !.
+    onIconMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
+
 constants
-app_name : string = "Крестики-нолики (пять в ряд)".
 app_font_name : string = "Verdana".
 game_levels : string* = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].
+
+constants
+app_name : string* = ["Крестики-нолики (пять в ряд)", "Tic-Tac-Toy (five in a row)"].
+opt_name: string* = ["Параметры", "Options"].
+player_comp: string* = ["Компьютер", "Computer"].
+player_user: string* = ["Человек", "Human"].
+level_tooltip: string* = ["Уровень автоигры", "Autoplay level"].
+home_tooltip: string* = ["К началу", "Home"].
+back_tooltip: string* = ["Назад", "Back"].
+forth_tooltip: string* = ["Вперед", "Forth"].
+end_tooltip: string* = ["В конец", "End"].
+btn_start: string* = ["Старт", "Start"].
+btn_start_pause: string* = ["Пауза", "Pause"].
+btn_start_auto: string* = ["Авто", "Auto"].
+btn_stop: string* = ["Стоп", "Stop"].
 
 domains
 pics = picture*.
@@ -35,6 +58,8 @@ win_gdi : windowGDI := getWindowGDI().
 hwnd : windowHandle := winGetActiveWindow().
 pic_shape : integer := 0.
 max_pic_shape : integer := 1.
+lang : integer := 1.
+max_lang : integer := 1.
 pic_n : pics  := [pictGetFromRes(bmp_n), pictGetFromRes(bmp_n)].
 pic_x : pics  := [pictGetFromRes(bmp_x), pictGetFromRes(bmp_x1)].
 pic_o : pics  := [pictGetFromRes(bmp_o), pictGetFromRes(bmp_o1)].
@@ -106,8 +131,10 @@ win_init() :-
     %winSetForeColor(hwnd, color_black),
     %winSetBackColor(hwnd, color_WhiteSmoke),
     %winClear(hwnd, color_WhiteSmoke),
-    setText(app_name),
+    %
+    set_lang(),
     info_StaticText_ctl:setVisible(false),
+    %
     gameOpt_ctl:setFont(win_small_font),
     x_listButton_ctl:addList(game_levels),
     o_listButton_ctl:addList(game_levels),
@@ -118,6 +145,7 @@ win_init() :-
     forth_pushButton_ctl:setFont(win_bold_font),
     end_pushButton_ctl:setFont(win_bold_font),
     icon_ctl:addMouseDblListener(onIconMouseDbl),
+    icon_ctl:addMouseDownListener(onIconMouseDown),
     %
     win_gdi:setFont(win_small_font),
     win_gdi:setPen(pen(1, ps_Solid, color_Gray)),
@@ -143,6 +171,27 @@ win_init() :-
     o_listButton_ctl:selectAt(EchoLevel-1, true),
     %
     move_set_state(),
+    !.
+
+predicates
+set_lang : ().
+clauses
+set_lang() :-
+    This:setText(nth(lang, app_name)),
+    gameOpt_ctl:setText(nth(lang, opt_name)),
+    x_Comp_ctl:setText(nth(lang, player_comp)),
+    x_User_ctl:setText(nth(lang, player_user)),
+    o_Comp_ctl:setText(nth(lang, player_comp)),
+    o_User_ctl:setText(nth(lang, player_user)),
+    play_pushButton_ctl:setText(nth(lang, btn_start)),
+    stop_pushButton_ctl:setText(nth(lang, btn_stop)),
+    Level_tooltip = nth(lang, level_tooltip),
+    x_listButton_ctl:tooltipText := toolTip::tip(Level_tooltip),
+    o_listButton_ctl:tooltipText := toolTip::tip(Level_tooltip),
+    home_pushButton_ctl:tooltipText := toolTip::tip(nth(lang, home_tooltip)),
+    back_pushButton_ctl:tooltipText := toolTip::tip(nth(lang, back_tooltip)),
+    forth_pushButton_ctl:tooltipText := toolTip::tip(nth(lang, forth_tooltip)),
+    end_pushButton_ctl:tooltipText := toolTip::tip(nth(lang, end_tooltip)),
     !.
 
 predicates
@@ -190,7 +239,7 @@ fill_cells(Flips, SmallPic) :-
                 N = math::random(3),
                 Xf = field_left + (I + pos_offset - 1) * cell_size + 4,
                 Yf = field_top + (J + pos_offset - 1) * cell_size + 4,
-                PicFlash = list::nth(pic_shape, list::nth(N, [pic_z, pic_x, pic_o])),
+                PicFlash = nth(pic_shape, nth(N, [pic_z, pic_x, pic_o])),
                 win_gdi:pictDraw(PicFlash, pnt(Xf, Yf), rop_SrcCopy)
             end if
         end foreach,
@@ -221,10 +270,11 @@ draw_cell(I, J, Attr, SmallPic) :-
           tuple(cell_back, 0, pic_nc), tuple(cell_back, 1, pic_zc),
           tuple(cell_claim, 0, pic_nm), tuple(cell_claim, 1, pic_zm)
         ],
-    PicField = list::nth(pic_shape, ListPicField),
+    PicField = nth(pic_shape, ListPicField),
     win_gdi:pictDraw(PicField, pnt(X+4*SmallPic, Y+4*SmallPic), rop_SrcCopy),
     %
-    xo_get_cell(coor(I, J), Mark),
+    ( xo_get_cell(coor(I, J), Mark) ; cellAdvice = cell(coor(I, J), Mark) ),
+    not(Mark = n),
     tuple(Mark, Attr, ListPicMark) in
         [ tuple(x, cell_space, pic_x), tuple(o, cell_space, pic_o),
           tuple(x, cell_flash, pic_xy), tuple(o, cell_flash, pic_oy),
@@ -232,7 +282,7 @@ draw_cell(I, J, Attr, SmallPic) :-
           tuple(x, cell_back, pic_xc), tuple(o, cell_back, pic_oc),
           tuple(x, cell_claim, pic_xm), tuple(o, cell_claim, pic_om)
         ],
-    PicMark = list::nth(pic_shape, ListPicMark),
+    PicMark = nth(pic_shape, ListPicMark),
     win_gdi:pictDraw(PicMark, pnt(X+4, Y+4), rop_SrcCopy),
     !.
 draw_cell(_I, _J, _Attr, _SmallPic).
@@ -536,11 +586,15 @@ last_turn() :-
     !.
 last_turn().
 
+facts
+cellAdvice : cell := cell(coor(0, 0), n).
+
 predicates
-turn_advice : () determ.
+turn_advice : () procedure.
 
 clauses
 turn_advice() :-
+    not( play_end(0) ),
     win_gdi:setPen(pen(1, ps_Solid, color_Gray)),
     win_gdi:setBrush(brush(pat_Solid, color_lightPink)),
     win_gdi:drawRect(rct(box_left, box_top, box_right, box_bottom)),
@@ -553,6 +607,8 @@ turn_advice() :-
     xo_play_once(Mode, PlayCell, _RuleName, _Rule),
     PlayCell = cell(coor(I, J), _),
     %
+    if Mark = x then AdviceMark = o else AdviceMark = x end if,
+    cellAdvice := cell(coor(I, J), AdviceMark),
     foreach
         _Loop = std::cIterate(3)
     do
@@ -561,7 +617,10 @@ turn_advice() :-
         draw_cell(I, J, cell_space, 1),
         programControl::sleep(125)
     end foreach,
+    cellAdvice := cell(coor(0, 0), n),
+    draw_cell(I, J, cell_space, 1),
     !.
+turn_advice().
 
 predicates
     onX_listButtonSelectionChanged : listControl::selectionChangedListener.
@@ -754,8 +813,13 @@ clauses
         !.
     onEnd_pushButtonMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
+predicates
+    onTimer : window::timerListener.
+clauses
+    onTimer(_Source, _Timer).
+
 % This code is maintained automatically, do not update it manually.
-%  14:16:31-8.4.2020
+%  10:00:26-2.7.2020
 
 facts
     gameOpt_ctl : groupBox.
@@ -792,6 +856,7 @@ clauses
         addMouseDownListener(onMouseDown),
         addMouseMoveListener(onMouseMove),
         addShowListener(onShow),
+        addTimerListener(onTimer),
         setPaintResponder(onPaint),
         gameOpt_ctl := groupBox::new(This),
         gameOpt_ctl:setText("Настройки"),

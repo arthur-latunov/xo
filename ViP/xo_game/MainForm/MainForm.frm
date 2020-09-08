@@ -15,7 +15,7 @@ tmpSL("frm_81",s("t_bar",0,1,n,m("pu",""),sl([]),0,0,1)).
 tmpSL("frm_81",s("c_pref",0,1,n,m("pu",""),sl([]),0,0,1)).
 tmpSL("frm_81",s("expattr",0,1,st("expattr4(1,9,1,1,1,1)"),m("pu",""),sl([]),0,0,1)).
 tmpSL("frm_81",s("id_custom",0,3,i(0),m("pu",""),n,0,0,1)).
-tmpSL("frm_81",s("upd_dt",0,1,st("14:16:31-8.4.2020"),d,sl([]),0,9,1)).
+tmpSL("frm_81",s("upd_dt",0,1,st("10:00:26-2.7.2020"),d,sl([]),0,9,1)).
 tmpSL("frm_81",s("rb_groups",0,13,n,n,sl([]),0,0,1)).
 tmpSL("frm_81",s("def_button",0,1,n,n,n,0,0,1)).
 tmpSL("frm_81",s("efile",0,1,st("MainForm\\MainForm.frm"),m("pu",""),st("0"),0,0,1)).
@@ -48,7 +48,7 @@ tmpSL("ev_frm_81~80~",s("MoveListener",5,1,n,n,st("window::moveListener"),9,0,2)
 tmpSL("ev_frm_81~80~",s("ShowListener",5,1,st("onShow"),n,st("window::showListener"),9,0,2)).
 tmpSL("ev_frm_81~80~",s("SizeListener",5,1,n,n,st("window::sizeListener"),9,0,2)).
 tmpSL("ev_frm_81~80~",s("StateListener",5,1,n,n,st("window::stateListener"),9,0,2)).
-tmpSL("ev_frm_81~80~",s("TimerListener",5,1,n,n,st("window::timerListener"),9,0,2)).
+tmpSL("ev_frm_81~80~",s("TimerListener",5,1,st("onTimer"),n,st("window::timerListener"),9,0,2)).
 tmpSL("ev_frm_81~80~",s("UserListener",5,1,n,n,st("window::userListener"),9,0,2)).
 tmpSL("ev_frm_81~80~",s("VScrollListener",5,1,n,n,st("window::scrollListener"),9,0,2)).
 tmpSL("ev_frm_81~80~",s("CharResponder",6,1,n,n,st("window::charResponder"),9,0,2)).
