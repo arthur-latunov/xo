@@ -4,6 +4,7 @@
 #include @"MainForm\MainForm.ph"
 
 % privately used packages
+#include @"pfc\gui\gdi\gdi.ph"
 #include @"pfc\console\console.ph"
 #include @"pfc\math\math.ph"
 #include @"pfc\list\list.ph"

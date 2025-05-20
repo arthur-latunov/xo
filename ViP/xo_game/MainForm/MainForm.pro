@@ -32,7 +32,7 @@ clauses
     onIconMouseDown(_Source, _Point, _ShiftControlAlt, _Button).
 
 constants
-app_font_name : string = "Verdana".
+app_font_name : string = "MS Sans Serif".
 game_levels : string* = ["1", "2", "3", "4", "5", "6", "7", "8", "9"].
 
 constants
@@ -46,8 +46,8 @@ back_tooltip: string* = ["Назад", "Back"].
 forth_tooltip: string* = ["Вперед", "Forth"].
 end_tooltip: string* = ["В конец", "End"].
 btn_start: string* = ["Старт", "Start"].
-btn_start_pause: string* = ["Пауза", "Pause"].
-btn_start_auto: string* = ["Авто", "Auto"].
+%btn_start_pause: string* = ["Пауза", "Pause"].
+%btn_start_auto: string* = ["Авто", "Auto"].
 btn_stop: string* = ["Стоп", "Stop"].
 
 domains
@@ -87,11 +87,11 @@ pic_zb : pics := [pictGetFromRes(bmp_zb), pictGetFromRes(bmp_zr)].
 */
 
 facts
-win_font : font := vpi::fontCreateByName(app_font_name, 10).
-win_bold_font : font := vpi::fontSetAttrs(win_font, [fs_Bold], 10).
+win_font : gui_native::logfont := vpi::fontCreateByName(app_font_name, 10).
+win_bold_font : gui_native::logfont := vpi::fontSetAttrs(win_font, [fs_Bold], 10).
 %win_underline_font : font := vpi::fontSetAttrs(win_font, [fs_UnderLine], 10).
-win_small_font : font := vpi::fontSetAttrs(win_font, [], 8).
-win_small_bold_font : font := vpi::fontSetAttrs(win_font, [fs_Bold], 8).
+win_small_font : gui_native::logfont := vpi::fontSetAttrs(win_font, [], 8).
+win_small_bold_font : gui_native::logfont := vpi::fontSetAttrs(win_font, [fs_Bold], 8).
 %win_small_underline_font : font := vpi::fontSetAttrs(win_font, [fs_UnderLine], 8).
 app_splash : integer := 0.
 

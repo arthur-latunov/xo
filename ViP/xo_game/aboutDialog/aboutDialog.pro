@@ -23,10 +23,8 @@ clauses
         version2_ctl:setText(versionString2),
         addShowListener(
             {  :-
-                F1 = vpiDomains::fromFont_logfont(version1_ctl:getFont()),
-                gui_native::logfont(Height, Width, Esc, Ori, _Weight, Italic, Underline, StrikeOut, CharSet, OutPrec, ClipPrec, Qual, Pitch, Face) = F1,
-                F2 = gui_native::logfont(Height * 3 div 2, Width, Esc, Ori, 800, Italic, Underline, StrikeOut, CharSet, OutPrec, ClipPrec, Qual, Pitch, Face),
-                version1_ctl:setFont(uncheckedConvert(font, F2))
+                gui_native::logfont(:Height = Height | Font) = version1_ctl:getFont(),
+                version1_ctl:setFont(gui_native::logfont(:Height = Height * 3 div 2, :Weight = 800 | Font))
             }).
 
 predicates
