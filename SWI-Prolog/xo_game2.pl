@@ -89,7 +89,8 @@ xo_get_cell(ID, X-Y, Mark, Ver) :-
     xo_get_cell(ID, X-Y, Mark, Ver, _TimeStamp).
 xo_get_cell(ID, X-Y, Mark, Ver, TimeStamp) :-
     xo_cell_id(ID, X-Y),
-    once( xo_cell_state(ID, Mark, Ver, TimeStamp) ),
+    once( xo_cell_state(ID, StateMark, Ver, TimeStamp) ),
+    Mark = StateMark,
     true.
 
 xo_set_cell(ID, X-Y, Mark) :-
@@ -166,8 +167,8 @@ xo_gen_cells(PosBegin, PosEnd) :-
     fail.
 xo_gen_cells(_, _) :-
     once( xo_cell(_, _) ),
-    %Ps = [xo_cell_id/2],
-    %compile_predicates(Ps),
+    Ps = [xo_cell_id/2],
+    compile_predicates(Ps),
     !.
 
 % пространство движений для поиска решения
@@ -211,8 +212,8 @@ xo_make_solves :-
     fail.
 xo_make_solves :-
     once( xo_solve(_, _) ),
-    %Ps = [xo_solve_cells/2, xo_cell_solves/3],
-    %compile_predicates(Ps),
+    Ps = [xo_solve_cells/2, xo_cell_solves/3],
+    compile_predicates(Ps),
     !.
 
 % собрать решение по ячейке
@@ -493,7 +494,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
     xo_limit_coor(WinLength, LimitData),
     member(Cost, [2, 1, 0]),
-    %check_point,
+    check_point,
     RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
     xo_rate_shape(RateShape, Method-Rate),
     findall( Extra-Method-Rate / Coor,
@@ -683,8 +684,10 @@ xo_rate_shape(RateShape, MethodRate) :-
 xo_rate(Mark, X, Y, Cost, Gift, Count) :-
     xo_rate(Mark, X-Y, Cost, Gift-Count).
 % xo_rate(Mark, Coor, Cost, Rate)
-xo_rate(Mark, Coor, Cost, Gift-Count) :-
+xo_rate(Mark, Coor, Cost, GiftCoef-CountCoef) :-
     once( xo_cell_id(ID, Coor) ),
+    once( xo_cell_solves(ID, SolveQty, _) ),
+    WinLength = 5,
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
@@ -694,6 +697,8 @@ xo_rate(Mark, Coor, Cost, Gift-Count) :-
              MarkedQtyList
     ),
     sum_int_pairs(MarkedQtyList, Gift-Count),
+    GiftCoef is Gift / SolveQty * WinLength,
+    CountCoef is Count / SolveQty,
     !.
 
 % sum_int_pairs(Pairs, SumPairs)
@@ -905,7 +910,8 @@ xo_test :-
 xo_test(Count) :-
     %set_prolog_flag(gc, false),
     between(1, Count, Value),
-    time(xo_test(Result, Solve)),
+    time( xo_test(Result, Solve) ),
+    %xo_test(Result, Solve),
     once( xo_step(Mark, Step, _, _) ),
     writeln(game_over(Value, Result, Mark, Step, Solve)),
     Value = Count,
@@ -918,8 +924,8 @@ xo_test(Result, Solve) :-
     memberchk(size(PosBegin, PosEnd), Params),
     %retractall( xo_step(_, _, _, _) ),
     PlayCell = cell(X-Y, _),
-    MaxStep = 10,
-    %MaxStep is round( float_integer_part( (PosEnd - PosBegin + 1) ^ 2 / 2 * sign(PosEnd - PosBegin + 1) ) ),
+    %MaxStep = 35,
+    MaxStep is round( float_integer_part( (PosEnd - PosBegin + 1) ^ 2 / 2 * sign(PosEnd - PosBegin + 1) ) ),
     between(1, MaxStep, _),
     member(Mode-Mark, [normal-CompMark, echo-UserMark]),
     ( xo_play_in(Mode-Mark, PlayCell, _-Rule)
