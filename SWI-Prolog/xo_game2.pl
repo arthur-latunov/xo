@@ -50,11 +50,11 @@ xo_params( [
                              random_best_pos,
                              random_best_chance,
                              next_step_win,
-                             -free_border,
-                             -dash_mark,
-                             -fork,
-                             -random_chance,
-                             -random_free_cell,
+                             free_border,
+                             dash_mark,
+                             fork,
+                             random_chance,
+                             random_free_cell,
                              -
                             ]),
               rules(echo, [
@@ -62,11 +62,11 @@ xo_params( [
                              random_best_pos,
                              random_best_chance,
                              next_step_win,
-                             -free_border,
-                             -dash_mark,
-                             -fork,
-                             -random_chance,
-                             -random_free_cell,
+                             free_border,
+                             dash_mark,
+                             fork,
+                             random_chance,
+                             random_free_cell,
                              -
                             ]),
               -
@@ -130,8 +130,9 @@ xo_get_solve_state(ID, State) :-
 xo_get_solve_state(ID, State, Ver) :-
     xo_get_solve_state(ID, State, Ver, _TimeStamp).
 xo_get_solve_state(ID, State, Ver, TimeStamp) :-
-    xo_solve_state(ID, HasChanceMark, X, O, N, Ver, TimeStamp),
-    State = [x-X, o-O, n-N] / HasChanceMark,
+    once( xo_solve_state(ID, HasChanceMark, X, O, N, Ver, TimeStamp) ),
+    State = [x-X1, o-O1, n-N1] / HasChanceMark1,
+    HasChanceMark = HasChanceMark1, X = X1, O = O1, N = N1,
     !.
 
 xo_set_solve_state(ID, State) :-
@@ -166,9 +167,9 @@ xo_gen_cells(PosBegin, PosEnd) :-
     asserta( xo_cell_state(ID1, n, 0, TimeStamp) ),
     fail.
 xo_gen_cells(_, _) :-
-    once( xo_cell(_, _) ),
-    Ps = [xo_cell_id/2],
-    compile_predicates(Ps),
+    %once( xo_cell(_, _) ),
+    %Ps = [xo_cell_id/2],
+    %compile_predicates(Ps),
     !.
 
 % пространство движений для поиска решения
@@ -213,7 +214,7 @@ xo_make_solves :-
 xo_make_solves :-
     once( xo_solve(_, _) ),
     Ps = [xo_solve_cells/2, xo_cell_solves/3],
-    compile_predicates(Ps),
+    %compile_predicates(Ps),
     !.
 
 % собрать решение по ячейке
@@ -297,8 +298,8 @@ xo_win(Mode, Mark, Solve) :-
     memberchk(line(WinLength), Params),
     memberchk(go(CompMark, UserMark), Params),
     member(Mode-Mark, [normal-CompMark, echo-UserMark]),
-    xo_solve(Solve, State/Mark),
-    memberchk(Mark-WinLength, State),
+    xo_has_chance(Mark, Solve_ID, WinLength),
+    xo_solve(Solve_ID, Solve, _),
     !.
 
 % ничья
@@ -387,19 +388,23 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     ( % n nooon n
       First = cell(_, n),
       Last = cell(_, n),
-      xo_has_chance(Mark, SolveBorder1, ToWinLength),
+      xo_has_chance(Mark, SolveBorder1_ID, ToWinLength),
+      xo_solve(SolveBorder1_ID, SolveBorder1, _),
       append(Right, [cell(_, n)], SolveBorder1),
-      xo_has_chance(Mark, SolveBorder2, ToWinLength),
+      xo_has_chance(Mark, SolveBorder2_ID, ToWinLength),
+      xo_solve(SolveBorder2_ID, SolveBorder2, _),
       append([cell(_, n)], Left, SolveBorder2),
       PlayList = [First, Last]
     ; % _ nonoo n | _ nnooo n
-      xo_has_chance(Mark, SolveBorder1, ToWinLength),
+      xo_has_chance(Mark, SolveBorder1_ID, ToWinLength),
+      xo_solve(SolveBorder1_ID, SolveBorder1, _),
       append(Right, [cell(_, n)], SolveBorder1),
       FreeCell = cell(_, n),
       memberchk(FreeCell, Right),
       PlayList = [FreeCell]
     ; % n oonon _ | n ooonn _
-      xo_has_chance(Mark, SolveBorder2, ToWinLength),
+      xo_has_chance(Mark, SolveBorder2_ID, ToWinLength),
+      xo_solve(SolveBorder2_ID, SolveBorder2, _),
       append([cell(_, n)], Left, SolveBorder2),
       FreeCell = cell(_, n),
       memberchk(FreeCell, Left),
@@ -419,16 +424,19 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     plus(WinLength, -2, ToWinCut2),
     plus(WinLength, -3, ToWinCut3),
     ( Mark = CompMark ; Mark = UserMark ),
-    xo_has_chance(Mark, Solve, ToWinCut3),
+    xo_has_chance(Mark, Solve_ID, ToWinCut3),
+    xo_solve(Solve_ID, Solve, _),
     Solve = [First | Right],
     append(Left, [Last], Solve),
     %check_point,
     ( % o nonon o
       First = cell(_, n),
       Last = cell(_, n),
-      xo_has_chance(Mark, SolveBorder1, ToWinCut2),
+      xo_has_chance(Mark, SolveBorder1_ID, ToWinCut2),
+      xo_solve(SolveBorder1_ID, SolveBorder1, _),
       append(Right, [cell(_, Mark)], SolveBorder1),
-      xo_has_chance(Mark, SolveBorder2, ToWinCut2),
+      xo_has_chance(Mark, SolveBorder2_ID, ToWinCut2),
+      xo_solve(SolveBorder2_ID, SolveBorder2, _),
       append([cell(_, Mark)], Left, SolveBorder2),
       Left = [First | Middle],
       FreeCell = cell(_, n),
@@ -455,7 +463,8 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     findall( MarkedQty-Order-Mark-Solve,
              ( member(MarkedQty, MarkedQtyList),
                member(Order-Mark, OrderMarkList),
-               xo_has_chance(Mark, Solve, MarkedQty)
+               xo_has_chance(Mark, Solve_ID, MarkedQty),
+               xo_solve(Solve_ID, Solve, _)
              ),
              MarkedSolveList
     ),
@@ -494,7 +503,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
     xo_limit_coor(WinLength, LimitData),
     member(Cost, [2, 1, 0]),
-    check_point,
+    %check_point,
     RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
     xo_rate_shape(RateShape, Method-Rate),
     findall( Extra-Method-Rate / Coor,
@@ -684,10 +693,10 @@ xo_rate_shape(RateShape, MethodRate) :-
 xo_rate(Mark, X, Y, Cost, Gift, Count) :-
     xo_rate(Mark, X-Y, Cost, Gift-Count).
 % xo_rate(Mark, Coor, Cost, Rate)
-xo_rate(Mark, Coor, Cost, GiftCoef-CountCoef) :-
+xo_rate(Mark, Coor, Cost, Gift-Count) :-
     once( xo_cell_id(ID, Coor) ),
-    once( xo_cell_solves(ID, SolveQty, _) ),
-    WinLength = 5,
+    once( xo_cell_solves(ID, _SolveQty, _) ),
+    %WinLength = 5,
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
@@ -697,8 +706,8 @@ xo_rate(Mark, Coor, Cost, GiftCoef-CountCoef) :-
              MarkedQtyList
     ),
     sum_int_pairs(MarkedQtyList, Gift-Count),
-    GiftCoef is Gift / SolveQty * WinLength,
-    CountCoef is Count / SolveQty,
+    %GiftCoef is Gift / SolveQty * WinLength,
+    %CountCoef is Count / SolveQty,
     !.
 
 % sum_int_pairs(Pairs, SumPairs)
@@ -742,8 +751,9 @@ xo_has_fork([_ | TeilSolves], Fork) :-
 % оценка ситуации
 % xo_review(Mark, X, Y, Cost, OutMark, OutX, OutY)
 xo_review(Mark, X, Y, Cost, OutMark, OutX, OutY) :-
-    xo_has_chance(Mark, Solve, MarkedQty),
+    xo_has_chance(Mark, Solve_ID, MarkedQty),
     MarkedQty >= Cost,
+    xo_solve(Solve_ID, Solve, _),
     selectchk(cell(X-Y, n), Solve, Review),
     member(cell(OutX-OutY, OutMark), Review).
 
@@ -938,10 +948,10 @@ xo_test(Result, Solve) :-
     xo_mark_cell(Mode, X, Y),
     once( xo_step(Mark, Step, X, Y) ),
     writeln(step(Step, Mark, X, Y)-Rule),
-    %statistics(localused, L),
-    %statistics(globalused, G),
-    %statistics(trailused, T),
-    %writeln([localused-L, globalused-G, trailused-T]),
+    statistics(localused, L),
+    statistics(globalused, G),
+    statistics(trailused, T),
+    writeln([localused-L, globalused-G, trailused-T]),
     once( xo_cell_id(ID, X-Y) ),
     once( xo_cell_state(ID, M, V, TS) ),
     writeln([ID, M, V, TS]),
