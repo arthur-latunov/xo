@@ -115,15 +115,15 @@ xo_solve(Solve_ID, Solve, State) :-
       xo_solve_cells(Solve_ID, SolveCells)
      -> true
     ; xo_solve_cells(Solve_ID, SolveCells) ),
-    findall( cell(X-Y, Mark),
-             ( member(ID, SolveCells),
-               once( xo_cell_id(ID, X-Y) ),
-               once( xo_cell_state(ID, Mark, _, _) )
-             ),
-             Solve
-    ),
+    xo_solve_cells_state(SolveCells, Solve),
     xo_get_solve_state(Solve_ID, State),
     true.
+
+xo_solve_cells_state([], []).
+xo_solve_cells_state([cell(Coor, Cell_ID) | SolveCells], [cell(Coor, Mark) | SolveRest]) :-
+    xo_cell_state(Cell_ID, Mark, _, _),
+    !,
+    xo_solve_cells_state(SolveCells, SolveRest).
 
 xo_get_solve_state(ID, State) :-
     xo_get_solve_state(ID, State, _Ver, _TimeStamp).
@@ -180,7 +180,7 @@ xo_solve_moves([move(0, 1), move(0, -1)]).    % вертикаль
 xo_solve_moves([move(1, 1), move(-1, -1)]).   % диагональ1
 xo_solve_moves([move(1, -1), move(-1, 1)]).   % диагональ2
 
-% xo_solve_cells(Solve_ID, [Cell_ID_1, ..., Cell_ID_WinLength])
+% xo_solve_cells(Solve_ID, [cell(X-Y, Cell_ID_1), ..., cell(X-Y, Cell_ID_WinLength)])
 % xo_solve_state(Solve_ID, HasChanceMark, X, O, N, Ver, TimeStamp)
 % xo_cell_solves(Cell_ID, SolveQty, [Solve_ID_1, ..., Solve_ID_K])
 
@@ -193,9 +193,9 @@ xo_make_solves :-
     dynamic(Ps),
     xo_params(Params),
     memberchk(line(WinLength), Params),
-    xo_cell_id(_Cell_ID, X-Y),
+    xo_cell_id(Cell_ID, X-Y),
     xo_solve_moves(Moves),
-    xo_collect_solve(Moves, X-Y, X-Y, WinLength, [X-Y], SolveCells),
+    xo_collect_solve(Moves, X-Y, X-Y, WinLength, [cell(X-Y, Cell_ID)], SolveCells),
     \+ xo_solve_cells(_, SolveCells),
     ( xo_solve_cells(ID, _), succ(ID, ID1)  -> true ; ID1 = 1),
     asserta( xo_solve_cells(ID1, SolveCells) ),
@@ -205,7 +205,7 @@ xo_make_solves :-
 xo_make_solves :-
     xo_cell_id(ID, _),
     findall( Solve_ID,
-             ( xo_solve_cells(Solve_ID, SolveCells), memberchk(ID, SolveCells) ),
+             ( xo_solve_cells(Solve_ID, SolveCells), memberchk(cell(_, ID), SolveCells) ),
              CellSolves
     ),
     length(CellSolves, SolveQty),
@@ -213,31 +213,27 @@ xo_make_solves :-
     fail.
 xo_make_solves :-
     once( xo_solve(_, _) ),
-    Ps = [xo_solve_cells/2, xo_cell_solves/3],
+    %Ps = [xo_solve_cells/2, xo_cell_solves/3],
     %compile_predicates(Ps),
     !.
 
 % собрать решение по ячейке
 % xo_collect_solve(Moves, BeginCoor, CurrentCoor, WinLength, SolveCoors, SolveCells)
-xo_collect_solve(_, _, _, WinLength, SolveCoors, SolveCells) :-
-    length(SolveCoors, WinLength),
-    sort(SolveCoors, SortedSolveCoors),
-    findall( ID,
-             ( member(Coor, SortedSolveCoors), once( xo_cell_id(ID, Coor) ) ),
-             SolveCells
-    ),
+xo_collect_solve(_, _, _, WinLength, SolveCells0, SolveCells) :-
+    length(SolveCells0, WinLength),
+    sort(SolveCells0, SolveCells),
     !.
-xo_collect_solve([Move | Moves], BeginCoor, X-Y, WinLength, SolveCoors, SolveCells) :-
+xo_collect_solve([Move | Moves], BeginCoor, X-Y, WinLength, SolveCells0, SolveCells) :-
     Move = move(DeltaX, DeltaY),
     plus(X, DeltaX, X1),
     plus(Y, DeltaY, Y1),
-    xo_cell(X1-Y1, _),
-    SolveCoors1 = [X1-Y1 | SolveCoors],
+    xo_cell_id(ID1, X1-Y1),
+    SolveCells1 = [cell(X1-Y1, ID1) | SolveCells0],
     !,
-    xo_collect_solve([Move | Moves], BeginCoor, X1-Y1, WinLength, SolveCoors1, SolveCells).
-xo_collect_solve([_ | Moves], BeginCoor, _, WinLength, SolveCoors, SolveCells) :-
+    xo_collect_solve([Move | Moves], BeginCoor, X1-Y1, WinLength, SolveCells1, SolveCells).
+xo_collect_solve([_ | Moves], BeginCoor, _, WinLength, SolveCells0, SolveCells) :-
     !,
-    xo_collect_solve(Moves, BeginCoor, BeginCoor, WinLength, SolveCoors, SolveCells).
+    xo_collect_solve(Moves, BeginCoor, BeginCoor, WinLength, SolveCells0, SolveCells).
 
 % xo_mode_valid_rule(+Mode, +RuleName, -WinLength, -ModeLevel, -ModeGo)
 xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)) :-
