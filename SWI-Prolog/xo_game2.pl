@@ -28,7 +28,7 @@
 
 :- dynamic([xo_params/1, xo_rule/2]).
 :- dynamic([xo_cell_id/2, xo_cell_state/4]).
-:- dynamic([xo_solve_cells/2, xo_solve_state/7, xo_cell_solves/3]).
+:- dynamic([xo_solve_cells/3, xo_solve_state/7, xo_cell_solves/3]).
 :- dynamic([xo_step/4, xo_step_back/4 ]).
 
 % параметры игры
@@ -41,7 +41,7 @@
 xo_params( [
     size(0, 19),
     line(5),
-    level(4),
+    level(9),
     go(x, o),
     mode_opt([
               level(echo, +5),
@@ -112,9 +112,9 @@ xo_solve(Solve, State) :-
     xo_solve(_Solve_ID, Solve, State).
 xo_solve(Solve_ID, Solve, State) :-
     ( ground(Solve_ID),
-      xo_solve_cells(Solve_ID, SolveCells)
+      xo_solve_cells(Solve_ID, SolveCells, _)
      -> true
-    ; xo_solve_cells(Solve_ID, SolveCells) ),
+    ; xo_solve_cells(Solve_ID, SolveCells, _) ),
     xo_solve_cells_state(SolveCells, Solve),
     xo_get_solve_state(Solve_ID, State),
     true.
@@ -175,10 +175,10 @@ xo_gen_cells(_, _) :-
 % пространство движений для поиска решения
 % xo_solve_moves(SolveMoves)
 %   SolveMoves = [ move(DeltaX, DeltaY) | _ ]
-xo_solve_moves([move(1, 0), move(-1, 0)]).    % горизонталь
-xo_solve_moves([move(0, 1), move(0, -1)]).    % вертикаль
-xo_solve_moves([move(1, 1), move(-1, -1)]).   % диагональ1
-xo_solve_moves([move(1, -1), move(-1, 1)]).   % диагональ2
+xo_solve_moves([move(1, 0), move(-1, 0)], h).    % горизонталь
+xo_solve_moves([move(0, 1), move(0, -1)], v).    % вертикаль
+xo_solve_moves([move(1, 1), move(-1, -1)], d1).   % диагональ1
+xo_solve_moves([move(1, -1), move(-1, 1)], d2).   % диагональ2
 
 % xo_solve_cells(Solve_ID, [cell(X-Y, Cell_ID_1), ..., cell(X-Y, Cell_ID_WinLength)])
 % xo_solve_state(Solve_ID, HasChanceMark, X, O, N, Ver, TimeStamp)
@@ -194,18 +194,18 @@ xo_make_solves :-
     xo_params(Params),
     memberchk(line(WinLength), Params),
     xo_cell_id(Cell_ID, X-Y),
-    xo_solve_moves(Moves),
+    xo_solve_moves(Moves, MoveType),
     xo_collect_solve(Moves, X-Y, X-Y, WinLength, [cell(X-Y, Cell_ID)], SolveCells),
-    \+ xo_solve_cells(_, SolveCells),
+    \+ xo_solve_cells(_, SolveCells, _),
     ( xo_solve_cells(ID, _), succ(ID, ID1)  -> true ; ID1 = 1),
-    asserta( xo_solve_cells(ID1, SolveCells) ),
+    asserta( xo_solve_cells(ID1, SolveCells, MoveType) ),
     get_time(TimeStamp),
     asserta( xo_solve_state(ID1, n, 0, 0, WinLength, 0, TimeStamp) ),
     fail.
 xo_make_solves :-
     xo_cell_id(ID, _),
     findall( Solve_ID,
-             ( xo_solve_cells(Solve_ID, SolveCells), memberchk(cell(_, ID), SolveCells) ),
+             ( xo_solve_cells(Solve_ID, SolveCells, _), memberchk(cell(_, ID), SolveCells) ),
              CellSolves
     ),
     length(CellSolves, SolveQty),
@@ -213,7 +213,7 @@ xo_make_solves :-
     fail.
 xo_make_solves :-
     once( xo_solve(_, _) ),
-    %Ps = [xo_solve_cells/2, xo_cell_solves/3],
+    %Ps = [xo_solve_cells/3, xo_cell_solves/3],
     %compile_predicates(Ps),
     !.
 
@@ -267,7 +267,7 @@ xo_mode_go(normal, Go, Go).
 % есть шанс для выигрыша
 % xo_has_chance(Mark, Solve_ID, MarkedQty)
 xo_has_chance(Mark, Solve_ID, MarkedQty) :-
-    ( ground(Solve_ID) -> true ; xo_solve_cells(Solve_ID, _SolveCells) ),
+    ( ground(Solve_ID) -> true ; xo_solve_cells(Solve_ID, _SolveCells, _MoveType) ),
     once( xo_solve_state(Solve_ID, HasChanceMark, X, O, N, _Ver, _TimeStamp) ),
     xo_chance_state(Mark, HasChanceMark, X, O, N, MarkedQty),
     true.
@@ -448,6 +448,79 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % вилка
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = echo,
+    RuleName = fork,
+    xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
+    plus(WinLength, -2, ForkLen1),
+    % найти все тройки
+    xo_line_solves(ForkLen1, ExpSolves1),
+    % собрать из троек свободные клетки
+    findall( Cell,
+             ( member(exp_solve(_, _, _, FreeCells), ExpSolves1 ),
+               member(Cell, FreeCells)
+             ),
+    FreeCells01 ),
+    sort(FreeCells01, FreeCells1),
+    % найти все двойки
+    plus(WinLength, -3, ForkLen2),
+    xo_line_solves(ForkLen2, ExpSolves2),
+    % собрать из двоек свободные клетки
+    findall( Cell,
+             ( member(exp_solve(_, _, _, FreeCells), ExpSolves2 ),
+               member(Cell, FreeCells)
+             ),
+    FreeCells02 ),
+    sort(FreeCells02, FreeCells2),
+    %
+    ForkShapeList = [
+        fork_shape(CompMark-CompMark, ForkLen1-ForkLen1, 1), % x3-x3
+        fork_shape(UserMark-UserMark, ForkLen1-ForkLen1, 2), % o3-o3
+        
+        fork_shape(CompMark-CompMark, ForkLen1-ForkLen2, 3), % x3-x2
+        fork_shape(UserMark-UserMark, ForkLen1-ForkLen2, 4), % o3-o2
+        
+        fork_shape(CompMark-CompMark, ForkLen2-ForkLen1, 5), % x2-x3
+        fork_shape(UserMark-UserMark, ForkLen2-ForkLen2, 6), % o2-o3
+
+        fork_shape(CompMark-CompMark, ForkLen2-ForkLen2, 7), % x2-x2
+        fork_shape(UserMark-UserMark, ForkLen2-ForkLen2, 8), % o2-o2
+        
+        fork_shape(CompMark-UserMark, ForkLen1-ForkLen1, 9), % x3-o3
+        fork_shape(UserMark-CompMark, ForkLen1-ForkLen1, 10), % o3-x3
+
+        fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, 11), % x3-o2
+        fork_shape(UserMark-CompMark, ForkLen1-ForkLen2, 12), % o3-x2
+
+        fork_shape(CompMark-UserMark, ForkLen2-ForkLen1, 13), % x2-o3
+        fork_shape(UserMark-CompMark, ForkLen2-ForkLen2, 14), % o2-x3
+
+        fork_shape(CompMark-UserMark, ForkLen2-ForkLen2, 15), % x2-o2
+        fork_shape(UserMark-CompMark, ForkLen2-ForkLen2, 16), % o2-x2
+
+        -
+    ],
+    %
+    findall( ShapeForks,
+             ( member(fork_shape(Mark1-Mark2, Len1-Len2, Order), ForkShapeList),
+               ( Len1 = ForkLen1, FreeCells11 = FreeCells1, ExpSolves11 = ExpSolves1
+               ; Len1 = ForkLen2, FreeCells11 = FreeCells2, ExpSolves11 = ExpSolves2 ),
+               ( Len2 = ForkLen1, FreeCells22 = FreeCells1, ExpSolves22 = ExpSolves1
+               ; Len2 = ForkLen2, FreeCells22 = FreeCells2, ExpSolves22 = ExpSolves2 ),
+               xo_cell_forks(FreeCells11, FreeCells22, ExpSolves11, ExpSolves22, ShapeForks, Mark1-Mark2, Len1-Len2, Order),
+               true
+             ),
+    AllShapeForks),
+    %
+    flatten(AllShapeForks, ClaimForks),
+    sort(ClaimForks, PlayForks),
+    member(Fork, PlayForks),
+    Fork = fork(_, PlayCell, _, _, _, _),
+    % ...
+    Rule = rule(RuleName-new, Fork),
+    true.
+% вилка
+xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = normal,
     RuleName = fork,
     xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
     xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
@@ -561,6 +634,43 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
 xo_play(_, cell(Coor, n), none-rule(none)) :-
     xo_cell(Coor, n),
     true.
+
+% xo_line_solves(MarkedQty, ExpSolves)
+xo_line_solves(MarkedQty, ExpSolves) :-
+    findall( exp_solve(Solve_ID, MoveType, Mark, FreeCells),
+             ( xo_solve_cells(Solve_ID, SolveCells, MoveType),
+               once( xo_solve_state(Solve_ID, Mark, X, O, N, _, _) ),
+               \+ Mark = n,
+               xo_marked_qty(Mark, X, O, N, MarkedQty),
+               findall( cell(Coor, Cell_ID),
+                        ( member(cell(Coor, Cell_ID), SolveCells),
+                          once( xo_cell_state(Cell_ID, StateMark, _, _) ),
+                          StateMark = n
+                        ),
+               FreeCells )
+             ),
+    ExpSolves ),
+    !.
+
+xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Order) :-
+    findall( fork(Order, Cell, Solve_ID1-Solve_ID2, Mark1-Mark2, Len1-Len2, MoveType1-MoveType2),
+             ( % если некоторая ячейка из 1-го списка свободных ячеек
+               member(Cell, FreeCells1),
+               % присутствует во 2-м списке свободных ячеек
+               memberchk(Cell, FreeCells2),
+               % и есть два разных решения по указанным отметкам
+               member(exp_solve(Solve_ID1, MoveType1, Mark1, ExpFreeCells1), ExpSolves1),
+               member(exp_solve(Solve_ID2, MoveType2, Mark2, ExpFreeCells2), ExpSolves2),
+               \+ Solve_ID1 = Solve_ID2,
+               % в разных плоскостях
+               \+ MoveType1 = MoveType2,
+               % содержащие данную ячейку в списке свободных ячеек обоих решений
+               memberchk(Cell, ExpFreeCells1),
+               memberchk(Cell, ExpFreeCells2)
+               % то это вилка!
+             ),
+    Forks ),
+    !.
 
 % xo_rate_extra(Cost, ModeLevel, CompMark, NormalMark, Coor, Extra)
 xo_rate_extra(2, ModeLevel, CompMark, NormalMark, X-Y, Extra) :-
