@@ -384,6 +384,52 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = echo,
+    RuleName = free_border,
+    xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
+    plus(WinLength, -2, ToWinLength),
+    EvalLen is ToWinLength + 1,
+    length(EvalList, EvalLen),
+    %
+    ( Mark = CompMark ; Mark = UserMark ),
+    findall( claim(Solve_ID, SolveCells, MoveType),
+             ( xo_has_chance(Mark, Solve_ID, ToWinLength),
+               once( xo_solve_cells(Solve_ID, SolveCells, MoveType) )
+             ),
+    ClaimSolves ),
+    \+ ClaimSolves = [],
+    findall( free_border(Solve_ID1-Solve_ID2, SolveCells1-SolveCells2, MoveType1-MoveType2, FreeCells),
+             ( select(claim(Solve_ID1, SolveCells1, MoveType1), ClaimSolves, ClaimSolves2),
+               member(claim(Solve_ID2, SolveCells2, MoveType2), ClaimSolves2),
+               memberchk(MoveType1-MoveType2, [h-h, v-v, d1-d1, d2-d2, d1-d2, d2-d1]),
+               intersection(SolveCells1, SolveCells2, EvalList),
+               subtract(SolveCells1, EvalList, [cell(X1-Y1, Cell_ID1)]),
+               once( xo_cell_state(Cell_ID1, Mark1, _, _) ),
+               ( Mark1 = n, Cell_ID11 = [[cell(X1-Y1, Cell_ID1)]] -> true ; Cell_ID11 = [] ),
+               subtract(SolveCells2, EvalList, [cell(X2-Y2, Cell_ID2)]),
+               once( xo_cell_state(Cell_ID2, Mark2, _, _) ),
+               ( Mark2 = n, Cell_ID22 = [cell(X2-Y2, Cell_ID2)] -> true ; Cell_ID22 = [] ),
+               flatten([Cell_ID11, Cell_ID22], FreeCells),
+               true
+             ),
+    FreeBorderSolves ),
+    \+ FreeBorderSolves = [],
+    findall( FreeCells,
+             member(free_border(_, _, _, FreeCells), FreeBorderSolves),
+    AllFreeCells),
+    flatten(AllFreeCells, OfferPlayList),
+    \+ OfferPlayList = [],
+    sort(OfferPlayList, PlayList),
+    %check_point,
+    length(PlayList, PlayLength),
+    PlayIndex is random(PlayLength),
+    nth0(PlayIndex, PlayList, cell(X-Y, _Cell_ID)),
+    PlayCell = cell(X-Y, Mark),
+    Rule = rule(RuleName-new,Mark,X,Y),
+    true.
+% свободные края (выигрыш через ход)
+xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = normal,
     RuleName = free_border,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -2, ToWinLength),
@@ -520,7 +566,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     flatten(AllShapeForks, ClaimForks0),
     \+ ClaimForks0 = [],
     sort(ClaimForks0, ClaimForks),
-    (\+ ClaimForks = [] -> check_point ; true),
+    %(\+ ClaimForks = [] -> check_point ; true),
     xo_forks_multi_cell(ClaimForks, OfferForks, Weigth),
     %
     xo_rate_shape(_, Method-_),
@@ -1131,7 +1177,8 @@ xo_test :-
 xo_test(Count) :-
     %set_prolog_flag(gc, false),
     between(1, Count, Value),
-    time( xo_test(Result, Solve) ),
+    %time( xo_test(Result, Solve) ),
+    xo_test(Result, Solve),
     %xo_test(Result, Solve),
     once( xo_step(Mark, Step, _, _) ),
     writeln(game_over(Value, Result, Mark, Step, Solve)),
@@ -1151,8 +1198,8 @@ xo_test(Result, Solve) :-
     member(Mode-Mark, [normal-CompMark, echo-UserMark]),
     ( xo_play_in(Mode-Mark, PlayCell, _-Rule)
      -> true
-    ; time( once( xo_play(Mode, PlayCell, _-Rule) ) )
-    %; once( xo_play(Mode, PlayCell, _-Rule) )
+    %; time( once( xo_play(Mode, PlayCell, _-Rule) ) )
+    ; once( xo_play(Mode, PlayCell, _-Rule) )
     ),
     PlayCell = cell(X-Y, _),
     %MarkCell = cell(X-Y, n),
