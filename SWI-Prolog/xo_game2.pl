@@ -388,44 +388,45 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     RuleName = free_border,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -2, ToWinLength),
-    EvalLen is ToWinLength + 1,
-    length(EvalList, EvalLen),
     %
     ( Mark = CompMark ; Mark = UserMark ),
-    findall( claim(Solve_ID, SolveCells, MoveType),
-             ( xo_has_chance(Mark, Solve_ID, ToWinLength),
-               once( xo_solve_cells(Solve_ID, SolveCells, MoveType) )
-             ),
-    ClaimSolves ),
-    \+ ClaimSolves = [],
-    findall( free_border(Solve_ID1-Solve_ID2, SolveCells1-SolveCells2, MoveType1-MoveType2, FreeCells),
-             ( select(claim(Solve_ID1, SolveCells1, MoveType1), ClaimSolves, ClaimSolves2),
-               member(claim(Solve_ID2, SolveCells2, MoveType2), ClaimSolves2),
-               memberchk(MoveType1-MoveType2, [h-h, v-v, d1-d1, d2-d2, d1-d2, d2-d1]),
-               intersection(SolveCells1, SolveCells2, EvalList),
-               subtract(SolveCells1, EvalList, [cell(X1-Y1, Cell_ID1)]),
-               once( xo_cell_state(Cell_ID1, Mark1, _, _) ),
-               ( Mark1 = n, Cell_ID11 = [[cell(X1-Y1, Cell_ID1)]] -> true ; Cell_ID11 = [] ),
-               subtract(SolveCells2, EvalList, [cell(X2-Y2, Cell_ID2)]),
-               once( xo_cell_state(Cell_ID2, Mark2, _, _) ),
-               ( Mark2 = n, Cell_ID22 = [cell(X2-Y2, Cell_ID2)] -> true ; Cell_ID22 = [] ),
-               flatten([Cell_ID11, Cell_ID22], FreeCells),
-               true
-             ),
-    FreeBorderSolves ),
-    \+ FreeBorderSolves = [],
-    findall( FreeCells,
-             member(free_border(_, _, _, FreeCells), FreeBorderSolves),
-    AllFreeCells),
-    flatten(AllFreeCells, OfferPlayList),
-    \+ OfferPlayList = [],
-    sort(OfferPlayList, PlayList),
+    xo_marked_solves(Mark, ToWinLength, MarkedSolves),
+    %
+    select(xo_solve(_, Solve, _), MarkedSolves, MarkedSolves1),
+    Solve = [First | Right],
+    append(Left, [Last], Solve),
+    %check_point
+    findall( PlayList0,
+            ( % n nooon n
+              First = cell(_, n),
+              Last = cell(_, n),
+              select(xo_solve(_, SolveBorder1, _), MarkedSolves1, MarkedSolves2),
+              append(Right, [cell(_, n)], SolveBorder1),
+              select(xo_solve(_, SolveBorder2, _), MarkedSolves2, _),
+              append([cell(_, n)], Left, SolveBorder2),
+              PlayList0 = [First, Last]
+            ; % _ nonoo n | _ nnooo n
+              select(xo_solve(_, SolveBorder1, _), MarkedSolves1, _),
+              append(Right, [cell(_, n)], SolveBorder1),
+              FreeCell = cell(_, n),
+              memberchk(FreeCell, Right),
+              PlayList0 = [FreeCell]
+            ; % n oonon _ | n ooonn _
+              select(xo_solve(_, SolveBorder2, _), MarkedSolves1, _),
+              append([cell(_, n)], Left, SolveBorder2),
+              FreeCell = cell(_, n),
+              memberchk(FreeCell, Left),
+              PlayList0 = [FreeCell]
+            ),
+    AllPlayList ),
+    flatten(AllPlayList, PlayList),
+    \+ PlayList = [],
     %check_point,
     length(PlayList, PlayLength),
     PlayIndex is random(PlayLength),
-    nth0(PlayIndex, PlayList, cell(X-Y, _Cell_ID)),
+    nth0(PlayIndex, PlayList, cell(X-Y, n)),
     PlayCell = cell(X-Y, Mark),
-    Rule = rule(RuleName-new,Mark,X,Y),
+    Rule = rule(RuleName-new,PlayCell-PlayList),
     true.
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
@@ -718,6 +719,18 @@ xo_line_solves(MarkedQty, ExpSolves) :-
                FreeCells )
              ),
     ExpSolves ),
+    !.
+
+% xo_marked_solves(Mark, MarkedQty, MarkedSolves)
+xo_marked_solves(Mark, MarkedQty, MarkedSolves) :-
+    findall( xo_solve(Solve_ID, Solve, MoveType),
+             ( xo_solve_cells(Solve_ID, SolveCells, MoveType),
+               once( xo_solve_state(Solve_ID, Mark1, X, O, N, _, _) ),
+               Mark1 = Mark,
+               xo_marked_qty(Mark, X, O, N, MarkedQty),
+               xo_solve_cells_state(SolveCells, Solve)
+             ),
+    MarkedSolves ),
     !.
 
 xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Weigth) :-
@@ -1177,8 +1190,8 @@ xo_test :-
 xo_test(Count) :-
     %set_prolog_flag(gc, false),
     between(1, Count, Value),
-    %time( xo_test(Result, Solve) ),
-    xo_test(Result, Solve),
+    time( xo_test(Result, Solve) ),
+    %xo_test(Result, Solve),
     %xo_test(Result, Solve),
     once( xo_step(Mark, Step, _, _) ),
     writeln(game_over(Value, Result, Mark, Step, Solve)),
@@ -1198,8 +1211,8 @@ xo_test(Result, Solve) :-
     member(Mode-Mark, [normal-CompMark, echo-UserMark]),
     ( xo_play_in(Mode-Mark, PlayCell, _-Rule)
      -> true
-    %; time( once( xo_play(Mode, PlayCell, _-Rule) ) )
-    ; once( xo_play(Mode, PlayCell, _-Rule) )
+    ; time( once( xo_play(Mode, PlayCell, _-Rule) ) )
+    %; once( xo_play(Mode, PlayCell, _-Rule) )
     ),
     PlayCell = cell(X-Y, _),
     %MarkCell = cell(X-Y, n),
