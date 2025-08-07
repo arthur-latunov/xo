@@ -324,6 +324,31 @@ xo_tie(_) :-
     \+ xo_cell(_, n),
     !.
 
+% xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells)
+xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells) :-
+    length(ShapePlayCells, ShapeLen),
+    ( Mark = CompMark ; Mark = UserMark ),
+    xo_marked_solves(Mark, MarkedQty, MarkedSolves),
+    %
+    findall(
+        PlayCell,
+        xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell),
+    AllPlayCells ),
+    \+ AllPlayCells = [],
+    %check_point,
+    sort(AllPlayCells, PlayCells),
+    true.
+
+% xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell)
+xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell) :-
+    select(xo_solve(_, Solve1, _), MarkedSolves, MarkedSolves1),
+    select(xo_solve(_, Solve2, _), MarkedSolves1, _),
+    intersection(Solve1, Solve2, ShapePlayCells),
+    FreeCell = cell(Coor, n),
+    member(FreeCell, ShapePlayCells),
+    PlayCell = cell(Coor, Mark),
+    true.
+
 % игра
 % xo_play(Mode, X, Y, Rule)
 xo_play(Mode, X, Y, Rule) :-
@@ -385,48 +410,17 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
     Mode = echo,
-    RuleName = free_border,
-    xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
-    plus(WinLength, -2, ToWinLength),
-    %
-    ( Mark = CompMark ; Mark = UserMark ),
-    xo_marked_solves(Mark, ToWinLength, MarkedSolves),
-    %
-    select(xo_solve(_, Solve, _), MarkedSolves, MarkedSolves1),
-    Solve = [First | Right],
-    append(Left, [Last], Solve),
-    %check_point
-    findall( PlayList0,
-            ( % n nooon n
-              First = cell(_, n),
-              Last = cell(_, n),
-              select(xo_solve(_, SolveBorder1, _), MarkedSolves1, MarkedSolves2),
-              append(Right, [cell(_, n)], SolveBorder1),
-              select(xo_solve(_, SolveBorder2, _), MarkedSolves2, _),
-              append([cell(_, n)], Left, SolveBorder2),
-              PlayList0 = [First, Last]
-            ; % _ nonoo n | _ nnooo n
-              select(xo_solve(_, SolveBorder1, _), MarkedSolves1, _),
-              append(Right, [cell(_, n)], SolveBorder1),
-              FreeCell = cell(_, n),
-              memberchk(FreeCell, Right),
-              PlayList0 = [FreeCell]
-            ; % n oonon _ | n ooonn _
-              select(xo_solve(_, SolveBorder2, _), MarkedSolves1, _),
-              append([cell(_, n)], Left, SolveBorder2),
-              FreeCell = cell(_, n),
-              memberchk(FreeCell, Left),
-              PlayList0 = [FreeCell]
-            ),
-    AllPlayList ),
-    flatten(AllPlayList, PlayList),
-    \+ PlayList = [],
+    xo_mode_valid_rule(Mode, free_border, WinLength, _ModeLevel, go(CompMark, UserMark)),
+    plus(WinLength, -1, ToWinCut1), % 4
+    plus(WinLength, -2, ToWinCut2), % 3
+    member(ToWinCut, [ToWinCut1, ToWinCut2]),
+    xo_threat_four_cells(ToWinCut2, ToWinCut, go(CompMark, UserMark), PlayList),
     %check_point,
     length(PlayList, PlayLength),
     PlayIndex is random(PlayLength),
-    nth0(PlayIndex, PlayList, cell(X-Y, n)),
-    PlayCell = cell(X-Y, Mark),
-    Rule = rule(RuleName-new,PlayCell-PlayList),
+    nth0(PlayIndex, PlayList, PlayCell),
+    ( ToWinCut = ToWinCut1 -> RuleName = free_border ; RuleName = dash_mark ),
+    Rule = rule(RuleName-new, PlayCell-PlayList),
     true.
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
@@ -476,6 +470,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % тире (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = normal,
     RuleName = dash_mark,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -2, ToWinCut2),
