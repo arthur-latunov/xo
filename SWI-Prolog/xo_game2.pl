@@ -44,7 +44,7 @@ xo_params( [
     level(9),
     go(x, o),
     mode_opt([
-              level(echo, -1),
+              level(echo, -2),
               rules(normal, [
                              tie_by_chance,
                              random_best_pos,
@@ -326,26 +326,27 @@ xo_tie(_) :-
 
 % xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells)
 xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells) :-
-    length(ShapePlayCells, ShapeLen),
+    length(ShapeCells, ShapeLen),
     ( Mark = CompMark ; Mark = UserMark ),
     xo_marked_solves(Mark, MarkedQty, MarkedSolves),
     %
     findall(
         PlayCell,
-        xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell),
+        xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell),
     AllPlayCells ),
     \+ AllPlayCells = [],
     %check_point,
     sort(AllPlayCells, PlayCells),
     true.
 
-% xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell)
-xo_threat_four_cells_(Mark, ShapePlayCells, MarkedSolves, PlayCell) :-
+% xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell)
+xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell) :-
     select(xo_solve(_, Solve1, _), MarkedSolves, MarkedSolves1),
     select(xo_solve(_, Solve2, _), MarkedSolves1, _),
-    intersection(Solve1, Solve2, ShapePlayCells),
+    %intersection(Solve1, Solve2, ShapeCells),
+    append(_, ShapeCells, Solve1), append(ShapeCells, _, Solve2),
     FreeCell = cell(Coor, n),
-    member(FreeCell, ShapePlayCells),
+    member(FreeCell, ShapeCells),
     PlayCell = cell(Coor, Mark),
     true.
 
@@ -413,13 +414,15 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     xo_mode_valid_rule(Mode, free_border, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -1, ToWinCut1), % 4
     plus(WinLength, -2, ToWinCut2), % 3
-    member(ToWinCut, [ToWinCut1, ToWinCut2]),
+    plus(WinLength, -3, ToWinCut3), % 2
+    ( ToWinCut = ToWinCut1, RuleName = free_border
+    ; ToWinCut = ToWinCut2, RuleName = dash_mark
+    ; ToWinCut = ToWinCut3, RuleName = side_by_side ),
     xo_threat_four_cells(ToWinCut2, ToWinCut, go(CompMark, UserMark), PlayList),
     %check_point,
     length(PlayList, PlayLength),
     PlayIndex is random(PlayLength),
     nth0(PlayIndex, PlayList, PlayCell),
-    ( ToWinCut = ToWinCut1 -> RuleName = free_border ; RuleName = dash_mark ),
     Rule = rule(RuleName-new, PlayCell-PlayList),
     true.
 % свободные края (выигрыш через ход)
@@ -527,34 +530,36 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
              ),
     FreeCells02 ),
     sort(FreeCells02, FreeCells2),
-    % fork_shape(Mark1-Mark2, Len1-Len2)
+    % fork_shape(Mark1-Mark2, Len1-Len2, Priority)
     ForkShapeList = [
-        fork_shape(CompMark-CompMark, ForkLen1-ForkLen1), % x3-x3
-        fork_shape(UserMark-UserMark, ForkLen1-ForkLen1), % o3-o3
-        
-        fork_shape(CompMark-CompMark, ForkLen1-ForkLen2), % x3-x2
-        fork_shape(UserMark-UserMark, ForkLen1-ForkLen2), % o3-o2
-        
-        fork_shape(CompMark-CompMark, ForkLen2-ForkLen2), % x2-x2
-        fork_shape(UserMark-UserMark, ForkLen2-ForkLen2), % o2-o2
-        
-        fork_shape(CompMark-UserMark, ForkLen1-ForkLen1), % x3-o3
+        fork_shape(CompMark-CompMark, ForkLen1-ForkLen1, 1), % x4-x4
+        fork_shape(UserMark-UserMark, ForkLen1-ForkLen1, 2), % o4-o4
 
-        fork_shape(CompMark-UserMark, ForkLen1-ForkLen2), % x3-o2
-        fork_shape(UserMark-CompMark, ForkLen1-ForkLen2), % o3-x2
+        fork_shape(CompMark-UserMark, ForkLen1-ForkLen1, 3), % x4-o4
+        fork_shape(UserMark-CompMark, ForkLen1-ForkLen1, 4), % o4-x4
 
-        fork_shape(CompMark-UserMark, ForkLen2-ForkLen2), % x2-o2
+        fork_shape(CompMark-CompMark, ForkLen1-ForkLen2, 5), % x4-x3
+        fork_shape(UserMark-UserMark, ForkLen1-ForkLen2, 6), % o4-o3
+        
+        fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, 7), % x4-o3
+        fork_shape(UserMark-CompMark, ForkLen1-ForkLen2, 8), % o4-x3
+
+        fork_shape(CompMark-CompMark, ForkLen2-ForkLen2, 9), % x3-x3
+        fork_shape(UserMark-UserMark, ForkLen2-ForkLen2, 10), % o3-o3
+
+        fork_shape(CompMark-UserMark, ForkLen2-ForkLen2, 11), % x3-o3
+        fork_shape(UserMark-CompMark, ForkLen2-ForkLen2, 12), % o3-x3
         -
     ],
     %
     Weigth is ForkLen1 * 2 + 1,
     findall( ShapeForks,
-             ( member(fork_shape(Mark1-Mark2, Len1-Len2), ForkShapeList),
+             ( member(fork_shape(Marks, Len1-Len2, Priority), ForkShapeList),
                ( Len1 = ForkLen1 -> FreeCells11 = FreeCells1, ExpSolves11 = ExpSolves1
                ; Len1 = ForkLen2, FreeCells11 = FreeCells2, ExpSolves11 = ExpSolves2 ),
                ( Len2 = ForkLen1 -> FreeCells22 = FreeCells1, ExpSolves22 = ExpSolves1
                ; Len2 = ForkLen2, FreeCells22 = FreeCells2, ExpSolves22 = ExpSolves2 ),
-               xo_cell_forks(FreeCells11, FreeCells22, ExpSolves11, ExpSolves22, ShapeForks, Mark1-Mark2, Len1-Len2, Weigth),
+               xo_cell_forks(FreeCells11, FreeCells22, ExpSolves11, ExpSolves22, ShapeForks, Marks, Len1-Len2, Weigth, Priority),
                true
              ),
     AllShapeForks),
@@ -569,7 +574,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method),
     %
     sort(0, @>, RatedOfferForks, [BestFork | TeilForkList]),
-    %
+    % fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes)
     BestFork = fork(Order, _, _, _, _, _),
     PlayFork = fork(Order, _, _, _, _, _),
     findall( PlayFork,
@@ -644,9 +649,11 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
                xo_check_coor(Coor, LimitData),
                xo_rate(CompMark, Coor, Cost, CompGift-CompCount),
                xo_rate(UserMark, Coor, Cost, UserGift-UserCount),
-               TotalCount is CompCount + UserCount,
-               TotalCount > 0,
-               TotalGift is CompGift + UserGift,
+               TotalCount0 is CompCount + UserCount,
+               TotalCount0 > 0,
+               TotalGift0 is CompGift + UserGift,
+               to_currency(TotalCount0, TotalCount),
+               to_currency(TotalGift0, TotalGift),
                xo_rate_extra(Cost, ModeLevel, CompMark, Mark1, Coor, Extra)
              ),
              RateCoorList
@@ -727,9 +734,9 @@ xo_marked_solves(Mark, MarkedQty, MarkedSolves) :-
              ),
     MarkedSolves ),
     !.
-
-xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Weigth) :-
-    findall( fork(CellCoef-1-0.0-Flatness, Cell, Solve_ID11-Solve_ID22, Mark1-Mark2, Len1-Len2, MoveType1-MoveType2),
+% xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Marks, Lens, Weigth, Priority)
+xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Weigth, Priority) :-
+    findall( fork(Priority-1-Flatness-CellCoef-CellCoef-method(0)/[], Cell, Solve_ID11-Solve_ID22, Mark1-Mark2, Len1-Len2, MoveType1-MoveType2),
              ( % если некоторая ячейка из 1-го списка свободных ячеек
                member(Cell, FreeCells1),
                % присутствует во 2-м списке свободных ячеек
@@ -745,7 +752,8 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
                memberchk(Cell, ExpFreeCells2),
                % то это вилка!
                sort([Solve_ID1, Solve_ID2], [Solve_ID11, Solve_ID22]),
-               CellCoef is (Len1 + Len2) / Weigth,
+               CellCoef0 is (Len1 + Len2) / Weigth,
+               to_currency(CellCoef0, CellCoef),
                true
              ),
     Forks ),
@@ -755,56 +763,55 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
 xo_forks_multi_cell(ClaimForks, OfferForks, Weigth) :-
     xo_forks_multi_cell(ClaimForks, ClaimForks, OfferForks, Weigth),
     !.
+xo_forks_multi_cell(ClaimForks, ClaimForks, _).
+    
 xo_forks_multi_cell([], _, [], _).
 xo_forks_multi_cell([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferForks], Weigth) :-
-    ClaimFork = fork(CellCoef-_-CellRate-Flatness, Cell, Solve_ID1-Solve_ID2, Marks, Lens, MoveTypes),
+    ClaimFork = fork(Priority-_-Flatness-CellCoef-_AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     findall( CellCoef0,
-             ( ClaimFork0 = fork(CellCoef0-_-_, Cell, Solve_ID01-Solve_ID02, _, _, _),
+             ( ClaimFork0 = fork(_Priority-_ForksQty-_Flatness-CellCoef0-_CellRate, Cell, Solve_IDs0, _, _, _),
                member(ClaimFork0, ClaimForks0),
-               \+ [Solve_ID01-Solve_ID02] = [Solve_ID1-Solve_ID2],
-               \+ [Solve_ID02-Solve_ID01] = [Solve_ID1-Solve_ID2]
+               \+ Solve_IDs0 = Solve_IDs
              ),
     CellCoefList),
     sumlist([CellCoef | CellCoefList], SumCellCoef),
     length([CellCoef | CellCoefList], ForksQty),
-    AvgCellCoef is SumCellCoef / ForksQty,
-    to_currency(AvgCellCoef, CellCoef1),
-    OfferFork = fork(CellCoef1-ForksQty-CellRate-Flatness, Cell, Solve_ID1-Solve_ID2, Marks, Lens, MoveTypes),
+    AvgCellCoef0 is SumCellCoef / ForksQty,
+    to_currency(AvgCellCoef0, AvgCellCoef),
+    OfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     !,
     xo_forks_multi_cell(ClaimForks, ClaimForks0, OfferForks, Weigth).
 
 % xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method)
 xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method) :-
+    fail, % disabled
     ModeLevel >= 8,
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel, CompMark, UserMark, Method).
+    xo_forks_cell_rate_(OfferForks, RatedOfferForks, CompMark, UserMark, Method).
 xo_forks_cell_rate(OfferForks, OfferForks, _).
 
-xo_forks_cell_rate([], [], _, _, _, _).
-xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], ModeLevel, CompMark, UserMark, Method) :-
-    OfferFork = fork(CellCoef-ForksQty-_-Flatness, Cell, Solve_IDs, Marks, Lens, MoveTypes),
+xo_forks_cell_rate_([], [], _, _, _).
+xo_forks_cell_rate_([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark, UserMark, Method) :-
+    OfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-_, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     Cell = cell(_Coor, Cell_ID),
     xo_rate_cell_id(CompMark, Cell_ID, CompGift, CompCount),
     xo_rate_cell_id(UserMark, Cell_ID, UserGift, UserCount),
-    TotalGift is CompGift + UserGift,
-    TotalCount is CompCount + UserCount,
-    to_currency(CompGift, CompGift1, 2),
-    to_currency(UserGift, UserGift1, 2),
-    to_currency(CompCount, CompCount1, 2),
-    to_currency(UserCount, UserCount1, 2),
-    to_currency(TotalGift, TotalGift1, 2),
-    to_currency(TotalCount, TotalCount1, 2),
-    RateShape = [TotalGift1, TotalCount1, CompGift1, UserGift1, CompCount1, UserCount1],
+    TotalGift0 is CompGift + UserGift,
+    TotalCount0 is CompCount + UserCount,
+    to_currency(TotalGift0, TotalGift),
+    to_currency(TotalCount0, TotalCount),
+    RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
     xo_rate_shape(RateShape, Method-Rate),
     CellRate = method(Method)/Rate,
-    RatedOfferFork = fork(CellCoef-ForksQty-CellRate-Flatness, Cell, Solve_IDs, Marks, Lens, MoveTypes),
+    RatedOfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     !,
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel, CompMark, UserMark, Method).
+    xo_forks_cell_rate_(OfferForks, RatedOfferForks, CompMark, UserMark, Method).
 
-% xo_rate_cell_id(+Mark, +ID, ?GiftCoef, ?CountCoef)
+% xo_rate_cell_id(+Mark, +ID, -GiftCoef, -CountCoef)
 xo_rate_cell_id(Mark, ID, GiftCoef, CountCoef) :-
     ground([Mark, ID]),
     once( xo_cell_solves(ID, SolveQty, _) ),
-    WinLength = 5,
+    xo_params(Params),
+    memberchk(line(WinLength), Params),
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
@@ -814,8 +821,10 @@ xo_rate_cell_id(Mark, ID, GiftCoef, CountCoef) :-
              MarkedQtyList
     ),
     sum_int_pairs(MarkedQtyList, Gift-Count),
-    GiftCoef is Gift / (SolveQty * WinLength - 1),
-    CountCoef is Count / SolveQty,
+    GiftCoef0 is Gift / (SolveQty * WinLength - 1),
+    CountCoef0 is Count / SolveQty,
+    to_currency(GiftCoef0, GiftCoef),
+    to_currency(CountCoef0, CountCoef),
     !.
 
 % to_currency(+NumIn, -NumOut)
@@ -961,7 +970,8 @@ xo_rate(Mark, X, Y, Cost, Gift, Count) :-
 xo_rate(Mark, Coor, Cost, GiftCoef-CountCoef) :-
     once( xo_cell_id(ID, Coor) ),
     once( xo_cell_solves(ID, SolveQty, _) ),
-    WinLength = 5,
+    xo_params(Params),
+    memberchk(line(WinLength), Params),
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
