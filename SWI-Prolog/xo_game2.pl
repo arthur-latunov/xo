@@ -537,7 +537,14 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     %
     PlayFork = fork(_Order, PlayCell, _Solve_IDs, _Marks, _Lens, _MoveTypes),
     Rule = rule(RuleName-new, PlayFork),
-    true.
+    %
+    %check_point,
+    %Cost = 2,
+    %xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedCells),
+    %xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells),
+    %sort(MatchCells, SortedMatchCells),
+    %writeln(match_fork_best_chance-SortedMatchCells),
+    !.
 % вилка
 xo_play(Mode, PlayCell, RuleName-Rule) :-
     Mode = normal,
@@ -657,9 +664,56 @@ xo_play(_, cell(Coor, n), none-rule(none)) :-
     xo_cell(Coor, n),
     true.
 
+% xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells)
+xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells) :-
+  xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells, 1),
+  !.
+
+%fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes)
+xo_match_fork_best_chance([], _, [], _).
+xo_match_fork_best_chance([Fork | SortedForks], SortedCells, [CellDiff | MatchCells], Index) :-
+    Fork = fork(_, Cell, _, _, _, _),
+    ( xo_best_chance_pos(Cell, SortedCells, 1, Pos) -> true ; Pos = 0 ),
+    CellDiff = Index/Pos-Cell,
+    ( Fork1 = fork(_, Cell, _, _, _, _),
+      SortedForks = [Fork1 | _]
+     -> Index1 = Index
+    ; succ(Index, Index1) ),
+    !,
+    xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells, Index1).
+
+xo_best_chance_pos(Cell, [_-Cell | _], Pos, Pos).
+xo_best_chance_pos(Cell, [_ | SortedCells], Pos0, Pos) :-
+    succ(Pos0, Pos1),
+    !,
+    xo_best_chance_pos(Cell, SortedCells, Pos1, Pos).
+
+% xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedRateCells)
+xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedCells) :-
+    xo_mode_valid_rule(Mode, RuleName, _WinLength, _ModeLevel, go(CompMark, UserMark)),
+    % найти все ценные линии
+    xo_line_solves(Cost, ExpSolves),
+    \+ ExpSolves = [],
+    % собрать свободные клетки
+    findall( Cell,
+             ( member(exp_solve(_, _, _, FreeCells), ExpSolves ),
+               member(Cell, FreeCells)
+             ),
+    FreeCells0 ),
+    \+ FreeCells0 = [],
+    sort(FreeCells0, FreeCells),
+    findall( CellRate-cell(Coor, Cell_ID),
+             ( member(cell(Coor, Cell_ID), FreeCells),
+               xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate)
+             ),
+    RatedFreeCells),
+    sort(0, @>, RatedFreeCells, SortedCells),
+    %
+    !.
+    
 % xo_fork_engine(Mode, RuleName, Method, SortedForks)
 xo_fork_engine(Mode, RuleName, Method, SortedForks) :-
-    xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
+    xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     % найти все тройки
     plus(WinLength, -2, ForkLen1),
     xo_line_solves(ForkLen1, ExpSolves1),
@@ -704,7 +758,7 @@ xo_fork_engine(Mode, RuleName, Method, SortedForks) :-
     xo_forks_multi_cell(ClaimForks, OfferForks, Weigth),
     % 1-rate(TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount),
     xo_rate_shape(_, Method-_),
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method),
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method),
     %
     sort(0, @>, RatedOfferForks, SortedForks),
     !.
@@ -800,21 +854,15 @@ xo_forks_multi_cell([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferFor
     !,
     xo_forks_multi_cell(ClaimForks, ClaimForks0, OfferForks, Weigth).
 
-% xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method)
-xo_forks_cell_rate(OfferForks, RatedOfferForks, ModeLevel-go(CompMark, UserMark)-Method) :-
-    %fail, % disabled
-    ModeLevel >= 8,
-    xo_forks_cell_rate_(OfferForks, RatedOfferForks, CompMark-UserMark-Method).
-xo_forks_cell_rate(OfferForks, OfferForks, _).
-
-xo_forks_cell_rate_([], [], _).
-xo_forks_cell_rate_([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Method) :-
+% xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method)
+xo_forks_cell_rate([], [], _).
+xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Method) :-
     OfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-_, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     Cell = cell(_Coor, Cell_ID),
     xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate),
     RatedOfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     !,
-    xo_forks_cell_rate_(OfferForks, RatedOfferForks, CompMark-UserMark-Method).
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method).
 
 xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate) :-
     xo_rate_cell_id_(CompMark, Cell_ID, CompGift, CompCount),
@@ -1130,7 +1178,7 @@ xo_change_state(o, n, X, O, N, X1, O1, N1, H) :-
     succ(N, N1),
     plus(O, -1, O1),
     X1 = X,
-    ( X1 =:= 0, \+ O1 =:= 0, H = 0 ; H = n ),
+    ( X1 =:= 0, \+ O1 =:= 0, H = o ; H = n ),
     !.
 
 % шаг назад
