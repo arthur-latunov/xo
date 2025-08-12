@@ -44,7 +44,7 @@ xo_params( [
     level(9),
     go(x, o),
     mode_opt([
-              level(echo, -1),
+              level(echo, 0),
               rules(normal, [
                              tie_by_chance,
                              random_best_pos,
@@ -62,8 +62,8 @@ xo_params( [
                              random_best_pos,
                              random_best_chance,
                              next_step_win,
-                             free_border,
-                             dash_mark,
+                             -free_border,
+                             -dash_mark,
                              fork,
                              random_chance,
                              random_free_cell,
@@ -522,8 +522,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
 xo_play(Mode, PlayCell, RuleName-Rule) :-
     Mode = echo,
     RuleName = fork,
-    Method = 1,
-    xo_fork_engine(Mode, RuleName, Method, SortedForks),
+    xo_fork_engine(Mode, RuleName, SortedForks),
     % fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes)
     SortedForks = [BestFork | TeilForkList],
     BestFork = fork(Priority-ForksQty-Flatness-CellCoef-_-_, _, _, _, _, _),
@@ -539,8 +538,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     Rule = rule(RuleName-new, PlayFork),
     %
     %check_point,
-    %Cost = 2,
-    %xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedCells),
+    %xo_best_chance_engine(Mode, RuleName, 3, SortedCells),
     %xo_match_fork_best_chance(SortedForks, SortedCells, MatchCells),
     %sort(MatchCells, SortedMatchCells),
     %writeln(match_fork_best_chance-SortedMatchCells),
@@ -594,6 +592,35 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % случайный выбор из лучших шансов на выигрыш
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = echo,
+    RuleName = random_best_chance,
+    xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(_CompMark, _UserMark)),
+    %xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
+    xo_limit_coor(WinLength, _LimitData),
+    member(Cost, [2, 1]),
+    xo_best_chance_engine(Mode, RuleName, Cost, PlayCellList),
+    % CellRate-cell(Coor, Cell_ID)
+    % score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role)
+    %check_point,
+    length(PlayCellList, PlayLen),
+    catch( PlayBest is PlayLen // 2 ^ (ModeLevel - 2), _, PlayBest = 1 ),
+    catch( PlayIndex is random(PlayBest), _, PlayIndex = 0 ),
+    nth0(PlayIndex, PlayCellList, ClaimPlayCell),
+    ClaimPlayCell = Score/Rate/_-_,
+    findall( Score/Rate/Role-Cell,
+             member(Score/Rate/Role-Cell, PlayCellList),
+             OfferCells
+    ),
+    length(OfferCells, OfferLen),
+    OfferIndex is random(OfferLen),
+    nth0(OfferIndex, OfferCells, CompoundCell),
+    CompoundCell = _-cell(PlayCoor, _),
+    PlayCell = cell(PlayCoor, _),
+    Rule = rule(RuleName-new,CompoundCell,cost=Cost,length=PlayLen/OfferLen,index=PlayIndex/OfferIndex),
+    true.
+% случайный выбор из лучших шансов на выигрыш
+xo_play(Mode, PlayCell, RuleName-Rule) :-
+    Mode = normal,
     RuleName = random_best_chance,
     xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
     xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
@@ -688,8 +715,8 @@ xo_best_chance_pos(Cell, [_ | SortedCells], Pos0, Pos) :-
     !,
     xo_best_chance_pos(Cell, SortedCells, Pos1, Pos).
 
-% xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedRateCells)
-xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedCells) :-
+% xo_best_chance_engine(Mode, RuleName, Cost, SortedRateCells)
+xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
     xo_mode_valid_rule(Mode, RuleName, _WinLength, _ModeLevel, go(CompMark, UserMark)),
     % найти все ценные линии
     xo_line_solves(Cost, ExpSolves),
@@ -704,15 +731,15 @@ xo_best_chance_engine(Mode, RuleName, Method, Cost, SortedCells) :-
     sort(FreeCells0, FreeCells),
     findall( CellRate-cell(Coor, Cell_ID),
              ( member(cell(Coor, Cell_ID), FreeCells),
-               xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate)
+               xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate)
              ),
     RatedFreeCells),
     sort(0, @>, RatedFreeCells, SortedCells),
     %
     !.
     
-% xo_fork_engine(Mode, RuleName, Method, SortedForks)
-xo_fork_engine(Mode, RuleName, Method, SortedForks) :-
+% xo_fork_engine(Mode, RuleName, SortedForks)
+xo_fork_engine(Mode, RuleName, SortedForks) :-
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     % найти все тройки
     plus(WinLength, -2, ForkLen1),
@@ -757,8 +784,7 @@ xo_fork_engine(Mode, RuleName, Method, SortedForks) :-
     %(\+ ClaimForks = [] -> check_point ; true),
     xo_forks_multi_cell(ClaimForks, OfferForks, Weigth),
     % 1-rate(TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount),
-    xo_rate_shape(_, Method-_),
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method),
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1),
     %
     sort(0, @>, RatedOfferForks, SortedForks),
     !.
@@ -854,26 +880,76 @@ xo_forks_multi_cell([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferFor
     !,
     xo_forks_multi_cell(ClaimForks, ClaimForks0, OfferForks, Weigth).
 
-% xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method)
+% xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost)
 xo_forks_cell_rate([], [], _).
-xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Method) :-
+xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Cost) :-
     OfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-_, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     Cell = cell(_Coor, Cell_ID),
-    xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate),
+    xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate),
     RatedOfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
     !,
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Method).
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost).
 
-xo_rate_cell_id(CompMark-UserMark-Method, Cell_ID, CellRate) :-
+% xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate)
+xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate) :-
     xo_rate_cell_id_(CompMark, Cell_ID, CompGift, CompCount),
     xo_rate_cell_id_(UserMark, Cell_ID, UserGift, UserCount),
+    xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate),
+    !.
+    
+% xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate)
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift > UserGift, CompCount > UserCount,
+    Score = 80, Role = attack/total,
+    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift >= UserGift, CompCount = UserCount,
+    Score = 75, Role = attack/gift,
+    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift = UserGift, CompCount >= UserCount,
+    Score = 75, Role = attack/count,
+    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift < UserGift, CompCount < UserCount,
+    Score = 70, Role = defence/total,
+    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)/role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift =< UserGift, CompCount = UserCount,
+    Score = 65, Role = defence/gift,
+    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)/role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift = UserGift, CompCount =< UserCount,
+    Score = 65, Role = defence/count,
+    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)-role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 0,
+    Score = 50, Role = method/Method,
     TotalGift0 is CompGift + UserGift,
     TotalCount0 is CompCount + UserCount,
     to_currency(TotalGift0, TotalGift),
     to_currency(TotalCount0, TotalCount),
     RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
     xo_rate_shape(RateShape, Method-Rate),
-    CellRate = method(Method)/Rate,
+    CellRate = score(Score)/Rate/role(Role),
+    !.
+xo_rate_profile(_, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Score = 40, Role = avg,
+    AvgGift is (CompGift + UserGift) / 2,
+    AvgCount is (CompCount + UserCount) / 2,
+    CellRate = score(Score)/rate(AvgGift, AvgCount)-role(Role),
     !.
 
 % xo_rate_cell_id_(+Mark, +ID, -GiftCoef, -CountCoef)
