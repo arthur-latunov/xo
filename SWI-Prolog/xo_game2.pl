@@ -780,7 +780,7 @@ xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
     
 % xo_fork_engine(Mode, RuleName, SortedForks)
 xo_fork_engine(Mode, RuleName, SortedForks) :-
-    xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
+    xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
     % найти все тройки
     plus(WinLength, -2, ForkLen1),
     xo_line_solves(ForkLen1, ExpSolves1),
@@ -813,17 +813,15 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
                ; Len1 = ForkLen2, FreeCells11 = FreeCells2, ExpSolves11 = ExpSolves2 ),
                ( Len2 = ForkLen1 -> FreeCells22 = FreeCells1, ExpSolves22 = ExpSolves1
                ; Len2 = ForkLen2, FreeCells22 = FreeCells2, ExpSolves22 = ExpSolves2 ),
-               xo_cell_forks(FreeCells11, FreeCells22, ExpSolves11, ExpSolves22, ShapeForks, Marks, Len1-Len2, Weigth, Priority),
+               xo_cell_forks(FreeCells11, FreeCells22, ExpSolves11, ExpSolves22, ShapeForks, Marks, Len1-Len2, Priority, Weigth),
                true
              ),
     AllShapeForks),
     %
-    flatten(AllShapeForks, ClaimForks0),
-    \+ ClaimForks0 = [],
-    sort(ClaimForks0, ClaimForks),
-    %(\+ ClaimForks = [] -> check_point ; true),
-    xo_forks_multi_cell(ClaimForks, OfferForks, Weigth),
-    % 1-rate(TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount),
+    flatten(AllShapeForks, ClaimForks),
+    \+ ClaimForks = [],
+    sort(0, @>, ClaimForks, SortedClaimForks),
+    xo_forks_multi_cell(SortedClaimForks, OfferForks),
     xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1),
     %
     sort(0, @>, RatedOfferForks, SortedForks),
@@ -871,10 +869,11 @@ xo_fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, ForkShapeList) :-
         - ],
     !.
 
-% xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Marks, Lens, Weigth, Priority)
-xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Weigth, Priority) :-
-    findall( fork(Priority-1-Flatness-CellCoef-CellCoef-method(0)/[], Cell, Solve_ID11-Solve_ID22, Mark1-Mark2, Len1-Len2, MoveType1-MoveType2),
-             ( % если некоторая ячейка из 1-го списка свободных ячеек
+% xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Marks, Lens, Priority, Weigth)
+xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Priority, Weigth) :-
+    findall( fork( pk(Priority, 1, Flatness), extra(0), coef(CellCoef, CellCoef),
+                   Cell, cross(Solve_ID11-Solve_ID22), img(Mark1-Mark2, Len1-Len2, MoveType1-MoveType2) ),
+             ( % если определенная ячейка из 1-го списка свободных ячеек
                member(Cell, FreeCells1),
                % присутствует во 2-м списке свободных ячеек
                memberchk(Cell, FreeCells2),
@@ -882,7 +881,7 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
                member(exp_solve(Solve_ID1, MoveType1, Mark1, ExpFreeCells1), ExpSolves1),
                member(exp_solve(Solve_ID2, MoveType2, Mark2, ExpFreeCells2), ExpSolves2),
                \+ Solve_ID1 = Solve_ID2,
-               % в разных плоскостях
+               % в двух плоскостях
                ( MoveType1 = MoveType2 -> Flatness = 1 ; Flatness = 2),
                % содержащие данную ячейку в списке свободных ячеек обоих решений
                memberchk(Cell, ExpFreeCells1),
@@ -896,17 +895,19 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
     Forks ),
     !.
 
-% xo_forks_multi_cell(ClaimForks, OfferForks, Weigth)
-xo_forks_multi_cell(ClaimForks, OfferForks, Weigth) :-
-    xo_forks_multi_cell(ClaimForks, ClaimForks, OfferForks, Weigth),
+% xo_forks_multi_cell(ClaimForks, OfferForks)
+xo_forks_multi_cell(ClaimForks, OfferForks) :-
+    xo_forks_multi_cell_(ClaimForks, ClaimForks, OfferForks),
     !.
-xo_forks_multi_cell(ClaimForks, ClaimForks, _).
+xo_forks_multi_cell_(ClaimForks, ClaimForks, _).
     
-xo_forks_multi_cell([], _, [], _).
-xo_forks_multi_cell([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferForks], Weigth) :-
-    ClaimFork = fork(Priority-_-Flatness-CellCoef-_-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
+xo_forks_multi_cell_([], _, []).
+xo_forks_multi_cell_([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferForks]) :-
+    ClaimFork = fork( pk(Priority, _ForksQty, Flatness), Extra, coef(CellCoef, CellCoef),
+                      Cell, cross(Solve_IDs), img(Marks, Lens, MoveTypes) ),
     findall( CellCoef0,
-             ( ClaimFork0 = fork(_-_-_-CellCoef0-_-_, Cell, Solve_IDs0, _, _, _),
+             ( ClaimFork0 = fork( _pk, _extra, coef(CellCoef0, _AvgCellCoef),
+                                  Cell, cross(Solve_IDs0), _img ),
                member(ClaimFork0, ClaimForks0),
                % Solve_IDs sorted in xo_cell_forks
                \+ Solve_IDs0 = Solve_IDs
@@ -916,9 +917,10 @@ xo_forks_multi_cell([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferFor
     length([CellCoef | CellCoefList], ForksQty),
     AvgCellCoef0 is SumCellCoef / ForksQty,
     to_currency(AvgCellCoef0, AvgCellCoef),
-    OfferFork = fork(Priority-ForksQty-Flatness-CellCoef-AvgCellCoef-CellRate, Cell, Solve_IDs, Marks, Lens, MoveTypes),
+    OfferFork = fork( pk(Priority, ForksQty, Flatness), Extra, coef(CellCoef, AvgCellCoef),
+                      Cell, cross(Solve_IDs), img(Marks, Lens, MoveTypes) ),
     !,
-    xo_forks_multi_cell(ClaimForks, ClaimForks0, OfferForks, Weigth).
+    xo_forks_multi_cell_(ClaimForks, ClaimForks0, OfferForks).
 
 % xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost)
 xo_forks_cell_rate([], [], _).
@@ -1015,61 +1017,69 @@ xo_best_cell(Mode, [Cost | Costs], [best_cell(Cost, 0) | BestCells]) :-
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift > UserGift, CompCount > UserCount,
-    Score = 80, Role = attack/total,
-    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    Rate = rate(CompGift, UserGift, CompCount, UserCount),
+    Score = score(80), Role = role(attack, total),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift > UserGift, CompCount = UserCount,
-    Score = 75, Role = attack/gift,
-    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    Rate = rate(CompGift, UserGift, CompCount, UserCount),
+    Score = score(75), Role = role(attack, gift),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift = UserGift, CompCount > UserCount,
-    Score = 75, Role = attack/count,
-    CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
+    Rate = rate(CompGift, UserGift, CompCount, UserCount),
+    Score = score(75), Role = role(attack, count),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift < UserGift, CompCount < UserCount,
-    Score = 70, Role = defence/total,
-    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)/role(Role),
+    Rate = rate(UserGift, CompGift, UserCount, CompCount),
+    Score = score(70), Role = role(defence, total),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift < UserGift, CompCount = UserCount,
-    Score = 65, Role = defence/gift,
-    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)/role(Role),
+    Rate = rate(UserGift, CompGift, UserCount, CompCount),
+    Score = score(65), Role = role(defence, gift),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift = UserGift, CompCount < UserCount,
-    Score = 65, Role = defence/count,
-    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)-role(Role),
+    Rate = rate(UserGift, CompGift, UserCount, CompCount),
+    Score = score(65), Role = role(defence, count),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
     CompGift = UserGift, CompCount = UserCount,
-    Score = 60, Role = neutral/pressure,
-    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)-role(Role),
+    Rate = rate(CompGift, UserGift, CompCount, UserCount),
+    Score = score(60), Role = role(neutral, pressure),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 0,
-    Score = 50, Role = method/Method,
+    Score = score(50), Role = role(method, Method),
     TotalGift0 is CompGift + UserGift,
     TotalCount0 is CompCount + UserCount,
     to_currency(TotalGift0, TotalGift),
     to_currency(TotalCount0, TotalCount),
     RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
     xo_rate_shape(RateShape, Method-Rate),
-    CellRate = score(Score)/Rate/role(Role),
+    CellRate = profile(Score, Rate, Role),
     !.
 xo_rate_profile(_, CompGift, UserGift, CompCount, UserCount, CellRate) :-
-    Score = 30, Role = lowcost/average,
+    Score = score(30), Role = role(lowcost, average),
     AvgGift is (CompGift + UserGift) / 2,
     AvgCount is (CompCount + UserCount) / 2,
-    CellRate = score(Score)/rate(AvgGift, AvgCount)-role(Role),
+    Rate = rate(AvgGift, AvgCount),
+    CellRate = profile(Score, Rate, Role),
     !.
 
 % xo_rate_cell_id_(+Mark, +ID, -GiftCoef, -CountCoef)
