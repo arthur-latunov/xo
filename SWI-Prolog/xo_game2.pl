@@ -30,6 +30,7 @@
 :- dynamic([xo_cell_id/2, xo_cell_state/4]).
 :- dynamic([xo_solve_cells/3, xo_solve_state/7, xo_cell_solves/3, xo_solve_cached/8]).
 :- dynamic([xo_step/4, xo_step_back/4 ]).
+:- dynamic([xo_cell_state_sim/4, xo_solve_state_sim/7]).
 
 % параметры игры
 % xo_params([Size, Line, Level, Go, ModeOpt])
@@ -88,17 +89,34 @@ xo_get_cell(ID, X-Y, Mark) :-
 xo_get_cell(ID, X-Y, Mark, Ver) :-
     xo_get_cell(ID, X-Y, Mark, Ver, _TimeStamp).
 xo_get_cell(ID, X-Y, Mark, Ver, TimeStamp) :-
-    xo_cell_id(ID, X-Y),
-    once( xo_cell_state(ID, StateMark, Ver, TimeStamp) ),
+    ( ground(ID) -> true ; xo_cell_id(ID, X-Y) ),
+    xo_cell_state_(ID, StateMark, Ver, TimeStamp),
     Mark = StateMark,
     true.
 
-xo_set_cell(ID, X-Y, Mark) :-
+xo_cell_state_(ID, StateMark, Ver, TimeStamp):-
+    xo_cell_state_sim(ID, StateMark, Ver, TimeStamp),
+    !.
+xo_cell_state_(ID, StateMark, Ver, TimeStamp):-
+    xo_cell_state(ID, StateMark, Ver, TimeStamp),
+    !.
+
+xo_set_cell(ID, Coor, Mark) :-
+    xo_set_cell(ID, Coor, Mark, 0).
+% xo_set_cell(ID, X-Y, Mark, Sim)
+xo_set_cell(ID, X-Y, Mark, 0) :-
     ( ground(ID) -> true ; xo_cell_id(ID, X-Y) ),
     xo_cell_state(ID, _, Ver, _TimeStamp),
     succ(Ver, Ver1),
     get_time(TimeStamp),
     asserta( xo_cell_state(ID, Mark, Ver1, TimeStamp) ),
+    !.
+xo_set_cell(ID, _, Mark, 1) :-
+    ground(ID), xo_cell_id(ID, _),
+    xo_cell_state_(ID, _, Ver, _TimeStamp),
+    succ(Ver, Ver1),
+    get_time(TimeStamp),
+    asserta( xo_cell_state_sim(ID, Mark, Ver1, TimeStamp) ),
     !.
 
 % пространство решений
@@ -108,10 +126,12 @@ xo_set_cell(ID, X-Y, Mark) :-
 %   Mark = {x ; o ; n}
 %   State = [x-Qty1, o-Qty2, n-Qty3]
 %   HasChanceMark
+% xo_solve_state(ID, HasChanceMark, X, O, N, Ver, TimeStamp)
 xo_solve(Solve, State) :-
     xo_solve(_Solve_ID, Solve, State).
 xo_solve(ID, Solve, State) :-
     ground(ID),
+    \+ xo_solve_state_sim(_, _, _, _, _, _, _),
     once( xo_solve_cached(ID, Solve, HasChanceMark, X, O, N, _Ver, _TimeStamp) ),
     once( xo_solve_state(ID, HasChanceMark1, X1, O1, N1, _, _) ),
     [HasChanceMark, X, O, N] = [HasChanceMark1, X1, O1, N1],
@@ -125,6 +145,7 @@ xo_solve(ID, Solve, State) :-
     xo_solve_cells_state(SolveCells, Solve),
     xo_get_solve_state(ID, State),
     ( ground(ID),
+      \+ xo_solve_state_sim(_, _, _, _, _, _, _),
       State = [x-X, o-O, n-N] / HasChanceMark,
       ( once( xo_solve_cached(ID, _, _, _, _, _, Ver, _) ), succ(Ver, Ver1) -> true ; Ver1 = 1),
       get_time(TimeStamp),
@@ -134,8 +155,8 @@ xo_solve(ID, Solve, State) :-
     true.
 
 xo_solve_cells_state([], []).
-xo_solve_cells_state([cell(Coor, Cell_ID) | SolveCells], [cell(Coor, Mark) | SolveRest]) :-
-    xo_cell_state(Cell_ID, Mark, _, _),
+xo_solve_cells_state([cell(Coor, ID) | SolveCells], [cell(Coor, Mark) | SolveRest]) :-
+    xo_get_cell(ID, Coor, Mark),
     !,
     xo_solve_cells_state(SolveCells, SolveRest).
 
@@ -144,21 +165,36 @@ xo_get_solve_state(ID, State) :-
 xo_get_solve_state(ID, State, Ver) :-
     xo_get_solve_state(ID, State, Ver, _TimeStamp).
 xo_get_solve_state(ID, State, Ver, TimeStamp) :-
-    once( xo_solve_state(ID, HasChanceMark, X, O, N, Ver, TimeStamp) ),
+    xo_solve_state_(ID, HasChanceMark, X, O, N, Ver, TimeStamp),
     State = [x-X1, o-O1, n-N1] / HasChanceMark1,
     [HasChanceMark, X, O, N] = [HasChanceMark1, X1, O1, N1],
     !.
 
+xo_solve_state_(ID, HasChanceMark, X, O, N, Ver, TimeStamp):-
+    xo_solve_state_sim(ID, HasChanceMark, X, O, N, Ver, TimeStamp),
+    !.
+xo_solve_state_(ID, HasChanceMark, X, O, N, Ver, TimeStamp):-
+    xo_solve_state(ID, HasChanceMark, X, O, N, Ver, TimeStamp),
+    !.
+
 xo_set_solve_state(ID, State) :-
+    xo_set_solve_state(ID, State, 0).
+% xo_set_solve_state(ID, State, Sim)
+xo_set_solve_state(ID, State, 0) :-
     State = [x-X, o-O, n-N] / HasChanceMark,
     xo_solve_state(ID, _HasChanceMark, _X, _O, _N, Ver, _TimeStamp),
     succ(Ver, Ver1),
     get_time(TimeStamp),
     asserta( xo_solve_state(ID, HasChanceMark, X, O, N, Ver1, TimeStamp) ),
     !.
-
-% xo_cell_id(Cell_ID, X-Y)
-% xo_cell_state(Cell_ID, Mark, Ver, TimeStamp)
+xo_set_solve_state(ID, State, 1) :-
+    ground(ID),
+    State = [x-X, o-O, n-N] / HasChanceMark,
+    xo_solve_state_(ID, _HasChanceMark, _X, _O, _N, Ver, _TimeStamp),
+    succ(Ver, Ver1),
+    get_time(TimeStamp),
+    asserta( xo_solve_state_sim(ID, HasChanceMark, X, O, N, Ver1, TimeStamp) ),
+    !.
 
 % формирование пространства ячеек
 % xo_make_cells
@@ -168,7 +204,7 @@ xo_make_cells :-
     xo_gen_cells(PosBegin, PosEnd).
 
 xo_gen_cells(PosBegin, PosEnd) :-
-    Ps = [xo_cell_id/2, xo_cell_state/4],
+    Ps = [xo_cell_id/2, xo_cell_state/4, xo_cell_state_sim/4],
     dynamic(Ps),
     forall( member(P, Ps), abolish(P) ),
     dynamic(Ps),
@@ -201,7 +237,8 @@ xo_solve_moves([move(1, -1), move(-1, 1)], d2).   % диагональ2
 % формирование пространства решений
 % xo_make_solves
 xo_make_solves :-
-    Ps = [xo_solve_cells/3, xo_solve_state/7, xo_cell_solves/3, xo_solve_cached/8],
+    Ps = [ xo_solve_cells/3, xo_solve_state/7, xo_cell_solves/3,
+           xo_solve_cached/8, xo_solve_state_sim/7],
     dynamic(Ps),
     forall( member(P, Ps), abolish(P) ),
     dynamic(Ps),
@@ -282,7 +319,7 @@ xo_mode_go(normal, Go, Go).
 % xo_has_chance(Mark, Solve_ID, MarkedQty)
 xo_has_chance(Mark, Solve_ID, MarkedQty) :-
     ( ground(Solve_ID) -> true ; xo_solve_cells(Solve_ID, _SolveCells, _MoveType) ),
-    once( xo_solve_state(Solve_ID, HasChanceMark, X, O, N, _Ver, _TimeStamp) ),
+      xo_solve_state_(Solve_ID, HasChanceMark, X, O, N, _Ver, _TimeStamp),
     xo_chance_state(Mark, HasChanceMark, X, O, N, MarkedQty),
     true.
 
@@ -343,7 +380,7 @@ xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells) :-
 xo_marked_solves(Mark, MarkedQty, MarkedSolves) :-
     findall( xo_solve(Solve_ID, Solve, MoveType),
              ( xo_solve_cells(Solve_ID, SolveCells, MoveType),
-               once( xo_solve_state(Solve_ID, Mark1, X, O, N, _, _) ),
+               xo_solve_state_(Solve_ID, Mark1, X, O, N, _, _),
                Mark1 = Mark,
                xo_marked_qty(Mark, X, O, N, MarkedQty),
                xo_solve_cells_state(SolveCells, Solve)
@@ -606,9 +643,9 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     catch( PlayBest is PlayLen // 2 ^ (ModeLevel - 2), _, PlayBest = 1 ),
     catch( PlayIndex is random(PlayBest), _, PlayIndex = 0 ),
     nth0(PlayIndex, PlayCellList, ClaimPlayCell),
-    ClaimPlayCell = Score/Rate/_-_,
-    findall( Score/Rate/Role-Cell,
-             member(Score/Rate/Role-Cell, PlayCellList),
+    ClaimPlayCell = Extra-Score/Rate/_-_,
+    findall( Extra-Score/Rate/Role-Cell,
+             member(Extra-Score/Rate/Role-Cell, PlayCellList),
              OfferCells
     ),
     length(OfferCells, OfferLen),
@@ -717,7 +754,7 @@ xo_best_chance_pos(Cell, [_ | SortedCells], Pos0, Pos) :-
 
 % xo_best_chance_engine(Mode, RuleName, Cost, SortedRateCells)
 xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
-    xo_mode_valid_rule(Mode, RuleName, _WinLength, _ModeLevel, go(CompMark, UserMark)),
+    xo_mode_valid_rule(Mode, RuleName, _WinLength, ModeLevel, go(CompMark, UserMark)),
     % найти все ценные линии
     xo_line_solves(Cost, ExpSolves),
     \+ ExpSolves = [],
@@ -731,7 +768,10 @@ xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
     sort(FreeCells0, FreeCells),
     findall( CellRate-cell(Coor, Cell_ID),
              ( member(cell(Coor, Cell_ID), FreeCells),
-               xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate)
+               ( ModeLevel >= 9
+                 ->
+                 xo_rate_extra_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate)
+               ; xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate) )
              ),
     RatedFreeCells),
     sort(0, @>, RatedFreeCells, SortedCells),
@@ -793,12 +833,12 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
 xo_line_solves(MarkedQty, ExpSolves) :-
     findall( exp_solve(Solve_ID, MoveType, Mark, FreeCells),
              ( xo_solve_cells(Solve_ID, SolveCells, MoveType),
-               once( xo_solve_state(Solve_ID, Mark, X, O, N, _, _) ),
+               xo_solve_state_(Solve_ID, Mark, X, O, N, _, _),
                \+ Mark = n,
                xo_marked_qty(Mark, X, O, N, MarkedQty),
                findall( cell(Coor, Cell_ID),
                         ( member(cell(Coor, Cell_ID), SolveCells),
-                          once( xo_cell_state(Cell_ID, StateMark, _, _) ),
+                          xo_cell_state_(Cell_ID, StateMark, _, _),
                           StateMark = n
                         ),
                FreeCells )
@@ -897,6 +937,80 @@ xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate) :-
     xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate),
     !.
     
+% xo_rate_extra_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate)
+xo_rate_extra_cell_id(CompMark-UserMark-Cost, Cell_ID, Extra-CellRate) :-
+    xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, CellRate),
+    xo_extra_scene(CompMark, Cell_ID, Extra),
+    !.
+
+% xo_extra_scene(Mark, ID, Extra)
+xo_extra_scene(_, _, extra(0)) :-
+    xo_cell_state_sim(_, _, _, _),
+    !.
+xo_extra_scene(Mark, ID, Extra) :-
+    ground([Mark, ID]),
+    xo_get_cell(ID, _, n),
+    xo_cell_solves(ID, _, CellSolves),
+    %
+    forall( member(Solve_ID, CellSolves),
+            ( xo_solve_state_(Solve_ID, _, X, O, N, _, _),
+              ( xo_change_state(n, Mark, X, O, N, X1, O1, N1, H1)
+               ->
+                ChangedState = [x-X1, o-O1, n-N1] / H1,
+                xo_set_solve_state(Solve_ID, ChangedState, 1)
+              ; true)
+            )
+    ),
+    xo_set_cell(ID, _, Mark, 1),
+    %
+    xo_next_step_win(WinQty),
+    xo_best_fork(BestFork),
+    xo_best_cell(0, [3, 2, 1], BestCells),
+    Extra =.. [extra, next_step_win(WinQty), best_fork(BestFork) | BestCells],
+    %
+    xo_cell_state_sim(ID, Mark, CellVer, _),
+    retract( xo_cell_state_sim(ID, Mark, CellVer, _) ),
+    forall( member(Solve_ID, CellSolves),
+            ( xo_solve_state_sim(Solve_ID, _, _, _, _, SolveVer, _),
+              retract( xo_solve_state_sim(Solve_ID, _, _, _, _, SolveVer, _) )
+            )
+    ),
+    !.
+xo_extra_scene(_, _, extra(fail)).
+
+xo_next_step_win(WinQty) :-
+    xo_params(Params),
+    memberchk(line(WinLength), Params),
+    plus(WinLength, -1, ToWinNextStep),
+    Mode = echo,
+    RuleName = random_best_chance,
+    xo_best_chance_engine(Mode, RuleName, ToWinNextStep, Cells),
+    length(Cells, WinQty),
+    !.
+xo_next_step_win(0).
+
+xo_best_fork(ForkScore) :-
+    Mode = echo,
+    RuleName = fork,
+    xo_fork_engine(Mode, RuleName, [BestFork | _]),
+    BestFork = fork(Priority-ForksQty-Flatness-CellCoef-_-_, _, _, _, _, _),
+    ForkScore = Priority-ForksQty-Flatness-CellCoef,
+    !.
+xo_best_fork(fork(0)).
+
+xo_best_cell(_, [], []).
+xo_best_cell(0, [Cost | Costs], [best_cell(Cost-CellScore) | BestCells]) :-
+    Mode = echo,
+    RuleName = random_best_chance,
+    xo_best_chance_engine(Mode, RuleName, Cost, [BestCell | _]),
+    BestCell = _-score(Score)/_/role(_)-cell(_, _),
+    CellScore = Score,
+    !,
+    xo_best_cell(1, Costs, BestCells).
+xo_best_cell(Mode, [Cost | Costs], [best_cell(Cost, 0) | BestCells]) :-
+    !,
+    xo_best_cell(Mode, Costs, BestCells).
+
 % xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate)
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
@@ -906,13 +1020,13 @@ xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
-    CompGift >= UserGift, CompCount = UserCount,
+    CompGift > UserGift, CompCount = UserCount,
     Score = 75, Role = attack/gift,
     CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
-    CompGift = UserGift, CompCount >= UserCount,
+    CompGift = UserGift, CompCount > UserCount,
     Score = 75, Role = attack/count,
     CellRate = score(Score)/rate(CompGift, CompCount, UserGift, UserCount)/role(Role),
     !.
@@ -924,14 +1038,20 @@ xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
-    CompGift =< UserGift, CompCount = UserCount,
+    CompGift < UserGift, CompCount = UserCount,
     Score = 65, Role = defence/gift,
     CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)/role(Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     Cost > 1,
-    CompGift = UserGift, CompCount =< UserCount,
+    CompGift = UserGift, CompCount < UserCount,
     Score = 65, Role = defence/count,
+    CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)-role(Role),
+    !.
+xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
+    Cost > 1,
+    CompGift = UserGift, CompCount = UserCount,
+    Score = 60, Role = neutral/pressure,
     CellRate = score(Score)/rate(UserGift, UserCount, CompGift, CompCount)-role(Role),
     !.
 xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
@@ -946,7 +1066,7 @@ xo_rate_profile(Cost, CompGift, UserGift, CompCount, UserCount, CellRate) :-
     CellRate = score(Score)/Rate/role(Role),
     !.
 xo_rate_profile(_, CompGift, UserGift, CompCount, UserCount, CellRate) :-
-    Score = 40, Role = avg,
+    Score = 30, Role = lowcost/average,
     AvgGift is (CompGift + UserGift) / 2,
     AvgCount is (CompCount + UserCount) / 2,
     CellRate = score(Score)/rate(AvgGift, AvgCount)-role(Role),
