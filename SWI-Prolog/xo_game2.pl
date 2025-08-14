@@ -45,7 +45,7 @@ xo_params( [
     level(9),
     go(x, o),
     mode_opt([
-              level(echo, 0),
+              level(echo, -1),
               rules(normal, [
                              tie_by_chance,
                              random_best_pos,
@@ -790,7 +790,7 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
     flatten(AllShapeForks, ClaimForks),
     \+ ClaimForks = [],
     %check_point,
-    sort(0, @>, ClaimForks, SortedClaimForks),
+    sort(ClaimForks, SortedClaimForks),
     xo_forks_multi_cell(SortedClaimForks, OfferForks),
     xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1-ModeLevel),
     %
@@ -918,7 +918,7 @@ xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, Profile) :-
     
 % xo_extra_scene(Mark, ID, Extra)
 xo_extra_scene(_-ModeLevel, _, 7-extra(0)) :-
-    ( ModeLevel < 8 ; xo_cell_state_sim(_, _, _, _) ),
+    ( ModeLevel < 8 ; xo_cell_state_sim(_, _, _, _) ; true),
     !.
 xo_extra_scene(Mark-_, ID, Extra) :-
     ground([Mark, ID]),
@@ -939,10 +939,10 @@ xo_extra_scene(Mark-_, ID, Extra) :-
             )
     ),
     %
-    xo_next_step_win(WinQty),
-    xo_best_fork(Mark, BestFork),
-    xo_best_cell(0, [3, 2, 1], BestCells),
-    Scene =.. [extra, 3-next_step_win(WinQty), 2-best_fork(BestFork) | BestCells],
+    xo_next_step_win(Mark, WinQty),
+    xo_best_fork(Mark, ForkQtyList),
+    xo_best_cell(0, [3, 2], PowerCells),
+    Scene =.. [extra, win_qty(WinQty), fork_qty(ForkQtyList) | PowerCells],
     Extra = 7-Scene,
     %
     retractall( xo_cell_state_sim(_, _, _, _) ),
@@ -950,41 +950,63 @@ xo_extra_scene(Mark-_, ID, Extra) :-
     !.
 xo_extra_scene(_, _, 7-extra(fail)).
 
-xo_next_step_win(_Mark, WinQty) :-
+xo_next_step_win(Mark, 1) :-
     xo_params(Params),
     memberchk(line(WinLength), Params),
     plus(WinLength, -1, ToWinNextStep),
-    Mode = echo,
-    RuleName = random_best_chance,
-    xo_best_chance_engine(Mode, RuleName, ToWinNextStep, Cells),
-    length(Cells, WinQty),
+    xo_has_chance(Mark, _Solve_ID, ToWinNextStep),
     !.
-xo_next_step_win(0).
+xo_next_step_win(_, 0).
 
-xo_best_fork(Mark, ForkScore) :-
+xo_best_fork(_Mark, ForkQtyList) :-
     Mode = echo,
     RuleName = fork,
     xo_fork_engine(Mode, RuleName, SortedForks),
-    select(BestFork, SortedForks, _),
-    check_point,
-    BestFork =.. BestForkArgs,
-    memberchk(img(Marks, _Lens, _MoveTypes), BestForkArgs),
-    memberchk(Marks, [Mark-_, _-Mark]),
-    memberchk(6-Order, BestForkArgs),
-    ForkScore = Order,
+    %check_point,
+    findall( Priority-ForkCoef,
+             ( member(Priority, [12, 10, 8, 6, 5, 4, 2]),
+               findall( ForkQty-1,
+                        ( member(Fork, SortedForks),
+                          Fork =.. ForkArgs,
+                          memberchk(6-order(Priority, ForkQty, _), ForkArgs),
+                          true
+                        ),
+               ForkPairList),
+               sum_int_pairs(ForkPairList, ForkQtySum-ForkCount),
+               ForkCoef0 is ForkQtySum / (ForkCount + 0.01) + 0.01,
+               to_currency(ForkCoef0, ForkCoef, 2),
+               true
+             ),
+    ForkQtyList),
     !.
-xo_best_fork(_, order(0, 0, 0)).
+xo_best_fork(_, []).
 
 xo_best_cell(_, [], []).
-xo_best_cell(0, [Cost | Costs], [1-best_cell(Cost, CellScore) | BestCells]) :-
+xo_best_cell(0, [Cost | Costs], [cell_qty(Cost, CellScore) | BestCells]) :-
     Mode = echo,
     RuleName = random_best_chance,
-    xo_best_chance_engine(Mode, RuleName, Cost, [BestCell | _]),
-    BestCell = turn(_Extra, 4-profile(Score, _Rate, _Role), _Cell),
-    CellScore = Score,
+    xo_best_chance_engine(Mode, RuleName, Cost, PlayCellList),
+    check_point,
+    %member(Turn, PlayCellList),
+    %Turn =.. TurnArgs,
+    %memberchk(4-profile(score(Score), _Rate, _Role), TurnArgs),
+    findall( Score,
+             ( member(Turn, PlayCellList),
+               Turn =.. TurnArgs,
+               memberchk(4-profile(score(Score), _, _), TurnArgs),
+               Score > 50,
+               true
+             ),
+    PowerScoreList),
+    check_point,
+    \+ PowerScoreList = [],
+    length(PowerScoreList, PowerScoreLen),
+    sumlist(PowerScoreList, PowerScoreSum),
+    CellScore0 is PowerScoreSum / (PowerScoreLen + 0.01) + 0.01,
+    to_currency(CellScore0, CellScore, 2),
     !,
     xo_best_cell(1, Costs, BestCells).
-xo_best_cell(Mode, [Cost | Costs], [1-best_cell(Cost, 0) | BestCells]) :-
+xo_best_cell(Mode, [Cost | Costs], [cell_qty(Cost, 0.0) | BestCells]) :-
     !,
     xo_best_cell(Mode, Costs, BestCells).
 
