@@ -1032,7 +1032,7 @@ xo_best_cell(Mode, [Cost | Costs], [avg_pf(Cost, 0.0-0.0) | BestCells]) :-
 
 % xo_rate_profile(+Cell_ID, +Cost, +Shape, -Profile)
 xo_rate_profile(Cell_ID, Cost-Method, Shape, Profile) :-
-    ground([Cell_ID, Cost, Shape]),
+    ground([Cell_ID, Cost-Method, Shape]),
     xo_rate_profile_(Cell_ID, Cost-Method, Shape, Profile),
     !.
 
