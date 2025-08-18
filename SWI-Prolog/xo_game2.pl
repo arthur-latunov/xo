@@ -739,9 +739,10 @@ xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
     FreeCells0 ),
     \+ FreeCells0 = [],
     sort(FreeCells0, FreeCells),
+    xo_rate_shape(_, Method-_),
     findall( turn(Profile, Extra, cell(Coor, Cell_ID)),
              ( member(cell(Coor, Cell_ID), FreeCells),
-               xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, Profile),
+               xo_rate_cell_id(CompMark-UserMark-Cost-Method, Cell_ID, Profile),
                xo_extra_scene(CompMark-ModeLevel, Cell_ID, Extra),
                true
              ),
@@ -796,7 +797,8 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
     %check_point,
     sort(ClaimForks, SortedClaimForks),
     xo_forks_multi_cell(SortedClaimForks, OfferForks),
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1-ModeLevel),
+    xo_rate_shape(_, Method-_),
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1-ModeLevel-Method),
     %
     sort(0, @>, RatedOfferForks, SortedForks),
     !.
@@ -900,13 +902,13 @@ xo_forks_multi_cell_([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferFo
     !,
     xo_forks_multi_cell_(ClaimForks, ClaimForks0, OfferForks).
 
-% xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost-ModeLevel)
+% xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost-ModeLevel-Method)
 xo_forks_cell_rate([], [], _).
-xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Cost-ModeLevel) :-
+xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks], CompMark-UserMark-Cost-ModeLevel-Method) :-
     OfferFork =
         fork(_Extra, Order, Coef, _Profile, Cell, Cross, Img),
     Cell = _-cell(_Coor, Cell_ID),
-    xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, Profile),
+    xo_rate_cell_id(CompMark-UserMark-Cost-Method, Cell_ID, Profile),
     xo_extra_scene(CompMark-ModeLevel, Cell_ID, Extra),
     RatedOfferFork0 =
         fork(Extra, Order, Coef, Profile, Cell, Cross, Img ),
@@ -914,10 +916,10 @@ xo_forks_cell_rate([OfferFork | OfferForks], [RatedOfferFork | RatedOfferForks],
     sort(0, @>, ForkArgs, SortedForkArgs),
     RatedOfferFork =.. [Head | SortedForkArgs],
     !,
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost-ModeLevel).
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost-ModeLevel-Method).
 
-% xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, Profile)
-xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, 4-Profile) :-
+% xo_rate_cell_id(CompMark-UserMark-Cost-Method, Cell_ID, Profile)
+xo_rate_cell_id(CompMark-UserMark-Cost-Method, Cell_ID, 4-Profile) :-
     xo_rate_cell_id_(CompMark, Cell_ID, Cost, CompGift, CompCount),
     xo_rate_cell_id_(UserMark, Cell_ID, Cost, UserGift, UserCount),
     TotalCount0 is CompCount + UserCount,
@@ -926,7 +928,7 @@ xo_rate_cell_id(CompMark-UserMark-Cost, Cell_ID, 4-Profile) :-
     to_currency(TotalGift0, TotalGift),
     to_currency(TotalCount0, TotalCount),
     Shape = [TotalGift-tg, TotalCount-tc, CompGift-cg, UserGift-ug, CompCount-cc, UserCount-uc],
-    xo_rate_profile(Cell_ID, Cost, Shape, Profile),
+    xo_rate_profile(Cell_ID, Cost-Method, Shape, Profile),
     !.
 xo_rate_cell_id(_, _, 4-pf(0)).
 
@@ -1029,12 +1031,12 @@ xo_best_cell(Mode, [Cost | Costs], [avg_pf(Cost, 0.0-0.0) | BestCells]) :-
 
 
 % xo_rate_profile(+Cell_ID, +Cost, +Shape, -Profile)
-xo_rate_profile(Cell_ID, Cost, Shape, Profile) :-
+xo_rate_profile(Cell_ID, Cost-Method, Shape, Profile) :-
     ground([Cell_ID, Cost, Shape]),
-    xo_rate_profile_(Cell_ID, Cost, Shape, Profile),
+    xo_rate_profile_(Cell_ID, Cost-Method, Shape, Profile),
     !.
 
-xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
+xo_rate_profile_(Cell_ID, Cost-_Method, Shape, Profile) :-
     Cost > 1,
     Shape = [TotalGift-tg, TotalCount-tc, CompGift-cg, UserGift-ug, CompCount-cc, UserCount-uc],
     CompGift >= UserGift, CompCount >= UserCount,
@@ -1048,7 +1050,7 @@ xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
     once( xo_cell_solves(Cell_ID, CenterFactor, _) ),
     Profile = pf(sc(Score), cf(CenterFactor), rate(Rate), Desc),
     !.
-xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
+xo_rate_profile_(Cell_ID, Cost-_Method, Shape, Profile) :-
     Cost > 1,
     Shape = [TotalGift-tg, TotalCount-tc, CompGift-cg, UserGift-ug, CompCount-cc, UserCount-uc],
     CompGift =< UserGift, CompCount =< UserCount,
@@ -1061,7 +1063,7 @@ xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
     once( xo_cell_solves(Cell_ID, CenterFactor, _) ),
     Profile = pf(sc(Score), cf(CenterFactor), rate(Rate), Desc),
     !.
-xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
+xo_rate_profile_(Cell_ID, Cost-Method, Shape, Profile) :-
     Cost > 0,
     Shape = [TotalGift-tg, TotalCount-tc, CompGift-cg, UserGift-ug, CompCount-cc, UserCount-uc],
     RateShape = [TotalGift, TotalCount, CompGift, UserGift, CompCount, UserCount],
