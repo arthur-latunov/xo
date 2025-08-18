@@ -1068,7 +1068,7 @@ xo_rate_profile_(Cell_ID, Cost, Shape, Profile) :-
     xo_rate_shape(RateShape, Method-Rate),
     Score = 50, Desc = desc(method, Method),
     once( xo_cell_solves(Cell_ID, CenterFactor, _) ),
-    Profile = pf(sc(Score), cf(CenterFactor), rate(Rate), Desc),
+    Profile = pf(sc(Score), cf(CenterFactor), Rate, Desc),
     !.
 xo_rate_profile_(Cell_ID, _, Shape, Profile) :-
     Shape = [TotalGift-tg, TotalCount-tc | _],
