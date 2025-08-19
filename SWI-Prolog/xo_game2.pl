@@ -780,7 +780,7 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
     %
     xo_fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, ForkShapeList),
     Weigth is ForkLen1 * 2 + 1,
-    %check_point,
+    check_point,
     findall( ShapeForks,
              ( member(fork_shape(Marks, Len1-Len2, Priority), ForkShapeList),
                ( Len1 = ForkLen1 -> FreeCells11 = FreeCells1, ExpSolves11 = ExpSolves1
@@ -798,7 +798,8 @@ xo_fork_engine(Mode, RuleName, SortedForks) :-
     sort(ClaimForks, SortedClaimForks),
     xo_forks_multi_cell(SortedClaimForks, OfferForks),
     xo_rate_shape(_, Method-_),
-    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-ForkLen1-ModeLevel-Method),
+    Cost = ForkLen2,
+    xo_forks_cell_rate(OfferForks, RatedOfferForks, CompMark-UserMark-Cost-ModeLevel-Method),
     %
     sort(0, @>, RatedOfferForks, SortedForks),
     !.
@@ -848,6 +849,8 @@ xo_fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, ForkShapeList) :-
 % fork( 7-extra(0), 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes) )
 % xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Marks, Lens, Priority, Weigth)
 xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Priority, Weigth) :-
+    \+ (FreeCells1 = [] ; FreeCells2 = []),
+    %check_point,
     findall( fork( 7-extra(0), 6-order(Priority, 1, Flatness), 5-coef(CellCoef, CellCoef), 4-pf(0),
                    2-Cell, 1-cross(Solve_ID11-Solve_ID22), 0-img(Mark1-Mark2, Len1-Len2, MoveType1-MoveType2) ),
              ( % если определенная ячейка из 1-го списка свободных ячеек
@@ -860,6 +863,7 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
                \+ Solve_ID1 = Solve_ID2,
                % в двух плоскостях
                ( MoveType1 = MoveType2 -> Flatness = 1 ; Flatness = 2),
+               ( member(Priority, [4,3,2,1]) -> Flatness = 2 ; true),
                % содержащие данную ячейку в списке свободных ячеек обоих решений
                memberchk(Cell, ExpFreeCells1),
                memberchk(Cell, ExpFreeCells2),
@@ -1618,5 +1622,21 @@ num_gen(X, Y, Z) :-
     num_gen(X1, Y, Z).
  %
 %%
+
+xo_print_center_factors :-
+    xo_params(Params),
+    memberchk(size(PosBegin, PosEnd), Params),
+    K is PosEnd - PosBegin + 1,
+    findall(ID-Qty, xo_cell_solves(ID, Qty, _), Xs0),
+    sort(Xs0, Xs),
+    split_list(Xs, K, Ys),
+    forall( member(Zs, Ys), ( forall(member(_-Z, Zs), format('~w;', [Z])), format('~n') ) ).
+
+split_list([], _, []) :- !.
+split_list(List, K, [Sub|Rest]) :-
+    length(Sub, K),
+    append(Sub, Tail, List),
+    split_list(Tail, K, Rest).
+
 
 
