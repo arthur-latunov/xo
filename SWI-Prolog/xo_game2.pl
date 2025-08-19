@@ -863,7 +863,8 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
                \+ Solve_ID1 = Solve_ID2,
                % в двух плоскостях
                ( MoveType1 = MoveType2 -> Flatness = 1 ; Flatness = 2),
-               ( member(Priority, [4,3,2,1]) -> Flatness = 2 ; true),
+               % для низкоприоритетных шаблонов обязательно в разных плоскостях
+               ( memberchk(Priority, [4,3,2,1]) -> Flatness = 2 ; true),
                % содержащие данную ячейку в списке свободных ячеек обоих решений
                memberchk(Cell, ExpFreeCells1),
                memberchk(Cell, ExpFreeCells2),
