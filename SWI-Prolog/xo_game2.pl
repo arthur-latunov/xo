@@ -39,14 +39,14 @@
 %   Level = level(Level) - уровень игры
 %   Go = go(CompMark, UserMark)CompMark, UserMark) - отметки хода
 %   ModeOpt - опции режима
+xo_max_solve_qty(20).
 xo_params( [
     size(0, 19),
     line(5),
-    max_solve_qty(20),
     level(9),
     go(x, o),
     mode_opt([
-              level(echo, -1),
+              level(echo, 0),
               rules(normal, [
                              tie_by_chance,
                              random_best_pos,
@@ -64,8 +64,8 @@ xo_params( [
                              random_best_pos,
                              random_best_chance,
                              next_step_win,
-                             -free_border,
-                             -dash_mark,
+                             free_border,
+                             dash_mark,
                              fork,
                              random_chance,
                              random_free_cell,
@@ -362,45 +362,6 @@ xo_tie(_) :-
     \+ xo_cell(_, n),
     !.
 
-% xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells)
-xo_threat_four_cells(MarkedQty, ShapeLen, go(CompMark, UserMark), PlayCells) :-
-    length(ShapeCells, ShapeLen),
-    ( Mark = CompMark ; Mark = UserMark ),
-    xo_marked_solves(Mark, MarkedQty, MarkedSolves),
-    %
-    findall(
-        PlayCell,
-        xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell),
-    AllPlayCells ),
-    \+ AllPlayCells = [],
-    %check_point,
-    sort(AllPlayCells, PlayCells),
-    true.
-
-% xo_marked_solves(Mark, MarkedQty, MarkedSolves)
-xo_marked_solves(Mark, MarkedQty, MarkedSolves) :-
-    findall( xo_solve(Solve_ID, Solve, MoveType),
-             ( xo_solve_cells(Solve_ID, SolveCells, MoveType),
-               xo_solve_state_(Solve_ID, Mark1, X, O, N, _, _),
-               Mark1 = Mark,
-               xo_marked_qty(Mark, X, O, N, MarkedQty),
-               xo_solve_cells_state(SolveCells, Solve)
-             ),
-    MarkedSolves ),
-    !.
-
-% xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell)
-xo_threat_four_cells_(Mark, ShapeCells, MarkedSolves, PlayCell) :-
-    select(xo_solve(_, Solve1, _), MarkedSolves, MarkedSolves1),
-    select(xo_solve(_, Solve2, _), MarkedSolves1, _),
-    %intersection(Solve1, Solve2, ShapeCells),
-    append(_, ShapeCells, Solve1), append(ShapeCells, _, Solve2),
-    FreeCell = cell(Coor, n),
-    member(FreeCell, ShapeCells),
-    PlayCell = cell(Coor, Mark),
-    true.
-
-
 % игра
 % xo_play(Mode, X, Y, Rule)
 xo_play(Mode, X, Y, Rule) :-
@@ -460,25 +421,10 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     Rule = rule(RuleName,Mark,X,Y),
     true.
 % свободные края (выигрыш через ход)
-xo_play(Mode, PlayCell, RuleName-Rule) :-
-    Mode = echo,
-    xo_mode_valid_rule(Mode, -free_border, WinLength, _ModeLevel, go(CompMark, UserMark)),
-    plus(WinLength, -1, ToWinCut1), % 4
-    plus(WinLength, -2, ToWinCut2), % 3
-    plus(WinLength, -3, ToWinCut3), % 2
-    ( ToWinCut = ToWinCut1, RuleName = free_border
-    ; ToWinCut = ToWinCut2, RuleName = dash_mark
-    ; ToWinCut = ToWinCut3, RuleName = side_by_side ),
-    xo_threat_four_cells(ToWinCut2, ToWinCut, go(CompMark, UserMark), PlayList),
-    %check_point,
-    length(PlayList, PlayLength),
-    PlayIndex is random(PlayLength),
-    nth0(PlayIndex, PlayList, PlayCell),
-    Rule = rule(RuleName-new, PlayCell-PlayList),
-    true.
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    Mode = normal,
+    %fail, % disabled
+    %Mode = normal,
     RuleName = free_border,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -2, ToWinLength),
@@ -524,7 +470,8 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % тире (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    Mode = normal,
+    %fail, % disabled
+    %Mode = normal,
     RuleName = dash_mark,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
     plus(WinLength, -2, ToWinCut2),
@@ -558,15 +505,14 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % вилка
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    Mode = echo,
+    %Mode = echo,
     RuleName = fork,
     xo_fork_engine(Mode, RuleName, SortedForks),
     %check_point,
     % fork( 7-extra(0), 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes))
     SortedForks = [BestFork | TeilForkList],
-    BestFork =.. BestForkArgs,
-    BestFork = fork(Order, Extra, _, _, _, _, _),
-    SimilarFork = fork(Order, Extra, _, _, _, _, _),
+    BestFork = fork(Order, _, _, Extra, _, _, _),
+    SimilarFork = fork(Order, _, _, Extra, _, _, _),
     findall( SimilarFork,
              member(SimilarFork, [BestFork | TeilForkList]),
     SimilarForks),
@@ -574,11 +520,13 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     PlayIndex is random(PlayLength),
     nth0(PlayIndex, SimilarForks, PlayFork),
     %
-    memberchk(2-PlayCell, BestForkArgs),
+    PlayFork =.. ForkArgs,
+    memberchk(2-PlayCell, ForkArgs),
     Rule = rule(RuleName-new, PlayFork),
     !.
 % вилка
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    fail, % disabled
     Mode = normal,
     RuleName = fork,
     xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
@@ -626,12 +574,11 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % случайный выбор из лучших шансов на выигрыш
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    Mode = echo,
+    %Mode = echo,
     RuleName = random_best_chance,
-    xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(_CompMark, _UserMark)),
+    xo_mode_valid_rule(Mode, RuleName, _WinLength, ModeLevel, go(_CompMark, _UserMark)),
     %xo_mode_go(Mode, go(Mark1, _Mark2), go(CompMark, UserMark)),
-    xo_limit_coor(WinLength, _LimitData),
-    member(Cost, [2, 1]),
+    member(Cost, [2, 1, 0]),
     xo_best_chance_engine(Mode, RuleName, Cost, PlayCellList),
     % turn(Extra, Profile, cell(Coor, Cell_ID))
     %check_point,
@@ -640,8 +587,8 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     catch( PlayIndex is random(PlayBest), _, PlayIndex = 0 ),
     nth0(PlayIndex, PlayCellList, ClaimCell),
 
-    ClaimCell = turn(_-pf(sc(Score), cf(CenterFactor), _, _), Extra,  _),
-    OfferCell = turn(_-pf(sc(Score), cf(CenterFactor), _, _), Extra, _),
+    ClaimCell = turn(Order, Extra,  _),
+    OfferCell = turn(Order, Extra, _),
     findall( OfferCell,
              member(OfferCell, PlayCellList),
              OfferCells
@@ -654,6 +601,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % случайный выбор из лучших шансов на выигрыш
 xo_play(Mode, PlayCell, RuleName-Rule) :-
+    fail, % disabled
     Mode = normal,
     RuleName = random_best_chance,
     xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
@@ -727,14 +675,18 @@ xo_play(_, cell(Coor, n), none-rule(none)) :-
 
 % xo_best_chance_engine(Mode, RuleName, Cost, SortedRateCells)
 xo_best_chance_engine(Mode, RuleName, Cost, SortedCells) :-
-    xo_mode_valid_rule(Mode, RuleName, _WinLength, ModeLevel, go(CompMark, UserMark)),
+    xo_mode_valid_rule(Mode, RuleName, WinLength, ModeLevel, go(CompMark, UserMark)),
+    xo_limit_coor(WinLength, LimitData),
     % найти все ценные линии
     xo_line_solves(Cost, ExpSolves),
     \+ ExpSolves = [],
     % собрать свободные клетки
     findall( Cell,
              ( member(exp_solve(_, _, _, FreeCells), ExpSolves ),
-               member(Cell, FreeCells)
+               member(Cell, FreeCells),
+               Cell = cell(Coor, _),
+               xo_check_coor(Coor, LimitData),
+               true
              ),
     FreeCells0 ),
     \+ FreeCells0 = [],
@@ -1008,9 +960,9 @@ xo_best_fork(_, []).
 %pf(sc(Score), cf(CenterFactor), rate(Rate), Desc)
 xo_best_cell(_, [], []).
 xo_best_cell(0, [Cost | Costs], [avg_pf(Cost, CellScore) | BestCells]) :-
-    Mode = echo,
+    %Mode = echo,
     RuleName = random_best_chance,
-    xo_best_chance_engine(Mode, RuleName, Cost, PlayCellList),
+    xo_best_chance_engine(_Mode, RuleName, Cost, PlayCellList),
     %check_point,
     findall( Score-CenterFactor,
              ( member(Turn, PlayCellList),
@@ -1095,7 +1047,7 @@ xo_rate_cell_id_(Mark, ID, Cost, GiftCoef, CountCoef) :-
     ground([Mark, ID, Cost]),
     xo_params(Params),
     memberchk(line(WinLength), Params),
-    memberchk(max_solve_qty(MaxSolveQty), Params),
+    xo_max_solve_qty(MaxSolveQty),
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
@@ -1267,7 +1219,7 @@ xo_rate(Mark, Coor, Cost, GiftCoef-CountCoef) :-
     once( xo_cell_id(ID, Coor) ),
     xo_params(Params),
     memberchk(line(WinLength), Params),
-    memberchk(max_solve_qty(MaxSolveQty), Params),
+    xo_max_solve_qty(MaxSolveQty),
     findall( MarkedQty-1,
              ( once( xo_cell_solves(ID, _, CellSolves) ),
                member(Solve_ID, CellSolves),
@@ -1624,6 +1576,13 @@ num_gen(X, Y, Z) :-
  %
 %%
 
+:- if(\+ current_predicate(sort/4)).
+sort(0, @>, List, SortedList) :-
+    sort(List, List1),
+    reverse(List1, SortedList),
+    !.
+:- endif.
+
 xo_print_center_factors :-
     xo_params(Params),
     memberchk(size(PosBegin, PosEnd), Params),
@@ -1638,6 +1597,5 @@ split_list(List, K, [Sub|Rest]) :-
     length(Sub, K),
     append(Sub, Tail, List),
     split_list(Tail, K, Rest).
-
 
 
