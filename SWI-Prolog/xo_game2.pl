@@ -423,7 +423,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
 % свободные края (выигрыш через ход)
 % свободные края (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    %fail, % disabled
+    fail, % disabled
     %Mode = normal,
     RuleName = free_border,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
@@ -470,7 +470,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     true.
 % тире (выигрыш через ход)
 xo_play(Mode, PlayCell, RuleName-Rule) :-
-    %fail, % disabled
+    fail, % disabled
     %Mode = normal,
     RuleName = dash_mark,
     xo_mode_valid_rule(Mode, RuleName, WinLength, _ModeLevel, go(CompMark, UserMark)),
@@ -509,7 +509,7 @@ xo_play(Mode, PlayCell, RuleName-Rule) :-
     RuleName = fork,
     xo_fork_engine(Mode, RuleName, SortedForks),
     %check_point,
-    % fork( 7-extra(0), 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes))
+    % fork( 7-extra(0), 6-order(Priority, Flatness, ForksQty), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes))
     SortedForks = [BestFork | TeilForkList],
     BestFork = fork(Order, _, _, Extra, _, _, _),
     SimilarFork = fork(Order, _, _, Extra, _, _, _),
@@ -798,12 +798,12 @@ xo_fork_shape(CompMark-UserMark, ForkLen1-ForkLen2, ForkShapeList) :-
         - ],
     !.
 
-% fork( 7-extra(0), 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes) )
+% fork( 7-extra(0), 6-order(Priority, Flatness, ForksQty), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes) )
 % xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Marks, Lens, Priority, Weigth)
 xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2, Len1-Len2, Priority, Weigth) :-
     \+ (FreeCells1 = [] ; FreeCells2 = []),
     %check_point,
-    findall( fork( 7-extra(0), 6-order(Priority, 1, Flatness), 5-coef(CellCoef, CellCoef), 4-pf(0),
+    findall( fork( 7-extra(0), 6-order(Priority, Flatness, 1), 5-coef(CellCoef, CellCoef), 4-pf(0),
                    2-Cell, 1-cross(Solve_ID11-Solve_ID22), 0-img(Mark1-Mark2, Len1-Len2, MoveType1-MoveType2) ),
              ( % если определенная ячейка из 1-го списка свободных ячеек
                member(Cell, FreeCells1),
@@ -833,11 +833,11 @@ xo_cell_forks(FreeCells1, FreeCells2, ExpSolves1, ExpSolves2, Forks, Mark1-Mark2
 xo_forks_multi_cell(ClaimForks, OfferForks) :-
     xo_forks_multi_cell_(ClaimForks, ClaimForks, OfferForks),
     !.
-% fork( 7-extra(0), 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes))
+% fork( 7-extra(0), 6-order(Priority, Flatness, ForksQty), 5-coef(CellCoef, AvgCellCoef), 4-profile(0), 2-Cell, 1-cross(Solve_IDs), 0-img(Marks, Lens, MoveTypes))
 xo_forks_multi_cell_([], _, []).
 xo_forks_multi_cell_([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferForks]) :-
     ClaimFork =
-        fork( Extra, 6-order(Priority, _ForksQty, Flatness), 5-coef(CellCoef, _), Profile,
+        fork( Extra, 6-order(Priority, Flatness, _ForksQty), 5-coef(CellCoef, _), Profile,
               Cell, 1-cross(Solve_IDs), Img ),
     findall( CellCoef0,
              ( ClaimFork0 =
@@ -854,7 +854,7 @@ xo_forks_multi_cell_([ClaimFork | ClaimForks], ClaimForks0, [OfferFork | OfferFo
     AvgCellCoef0 is SumCellCoef / ForksQty,
     to_currency(AvgCellCoef0, AvgCellCoef),
     OfferFork =
-        fork( Extra, 6-order(Priority, ForksQty, Flatness), 5-coef(CellCoef, AvgCellCoef),  Profile,
+        fork( Extra, 6-order(Priority, Flatness, ForksQty), 5-coef(CellCoef, AvgCellCoef),  Profile,
               Cell, 1-cross(Solve_IDs), Img ),
     !,
     xo_forks_multi_cell_(ClaimForks, ClaimForks0, OfferForks).
@@ -915,10 +915,15 @@ xo_extra_scene_(Mark-_, ID, Extra) :-
             )
     ),
     %
-    xo_next_step_win(Mark, WinQty),
-    xo_best_fork(Mark, ForkQtyList),
-    xo_best_cell(0, [3, 2], PowerCells),
-    Scene =.. [extra, win_qty(WinQty), fork_qty(ForkQtyList) | PowerCells],
+    xo_params(Params),
+    memberchk(line(WinLength), Params),
+    memberchk(go(CompMark, UserMark), Params),
+    member(Mode-Mark, [normal-CompMark, echo-UserMark]),
+    %
+    xo_next_step_win(Mark, WinLength, WinQty),
+    xo_best_fork(WinQty, Mode, ForkCoef),
+    xo_best_cell(WinQty, ForkCoef, Mode, [2, 1], PowerCells),
+    Scene =.. [extra, w(WinQty), f(ForkCoef) | PowerCells],
     Extra = Scene,
     %
     retractall( xo_cell_state_sim(_, _, _, _) ),
@@ -926,43 +931,35 @@ xo_extra_scene_(Mark-_, ID, Extra) :-
     !.
 xo_extra_scene_(_, _, extra(fail)).
 
-xo_next_step_win(Mark, 1) :-
-    xo_params(Params),
-    memberchk(line(WinLength), Params),
+xo_next_step_win(Mark, WinLength, 1) :-
     plus(WinLength, -1, ToWinNextStep),
     xo_has_chance(Mark, _Solve_ID, ToWinNextStep),
     !.
-xo_next_step_win(_, 0).
+xo_next_step_win(_, _, 0).
 
-xo_best_fork(_Mark, ForkQtyList) :-
-    Mode = echo,
+xo_best_fork(0, Mode, ForkCoef) :-
     RuleName = fork,
     xo_fork_engine(Mode, RuleName, SortedForks),
     %check_point,
-    findall( Priority-ForkCoef,
-             ( member(Priority, [12, 8, 4]),
-               findall( ForkQty-1,
-                        ( member(Fork, SortedForks),
-                          Fork =.. ForkArgs,
-                          memberchk(_-order(Priority, ForkQty, _), ForkArgs),
-                          true
-                        ),
-               ForkPairList),
-               sum_int_pairs(ForkPairList, ForkQtySum-ForkCount),
-               ForkCoef0 is ForkQtySum / (ForkCount + 0.0001) + 0.0001,
-               to_currency(ForkCoef0, ForkCoef, 2),
+    findall( CellCoef,
+             ( %member(Priority, [12, 8, 4]),
+               member(Fork, SortedForks),
+               Fork =.. ForkArgs,
+               %memberchk(_-order(Priority, _, _), ForkArgs),
+               memberchk(_-coef(CellCoef, _), ForkArgs),
                true
-             ),
-    ForkQtyList),
+              ),
+    ForkCellCoefs),
+    sumlist(ForkCellCoefs, ForkCoef0),
+    to_currency(ForkCoef0, ForkCoef),
     !.
-xo_best_fork(_, []).
+xo_best_fork(_, _, 0.0).
 
 %pf(sc(Score), cf(CenterFactor), rate(Rate), Desc)
-xo_best_cell(_, [], []).
-xo_best_cell(0, [Cost | Costs], [avg_pf(Cost, CellScore) | BestCells]) :-
-    %Mode = echo,
+xo_best_cell(_, _, _, [], []).
+xo_best_cell(0, 0.0, Mode, [Cost | Costs], [c(Cost, CellScore) | BestCells]) :-
     RuleName = random_best_chance,
-    xo_best_chance_engine(_Mode, RuleName, Cost, PlayCellList),
+    xo_best_chance_engine(Mode, RuleName, Cost, PlayCellList),
     %check_point,
     findall( Score-CenterFactor,
              ( member(Turn, PlayCellList),
@@ -981,10 +978,10 @@ xo_best_cell(0, [Cost | Costs], [avg_pf(Cost, CellScore) | BestCells]) :-
     to_currency(AvgCenterFactor0, AvgCenterFactor, 2),
     CellScore = AvgScore-AvgCenterFactor,
     !,
-    xo_best_cell(1, Costs, BestCells).
-xo_best_cell(Mode, [Cost | Costs], [avg_pf(Cost, 0.0-0.0) | BestCells]) :-
+    xo_best_cell(1, 0.0, Mode, Costs, BestCells).
+xo_best_cell(WinQty, ForkQtyList, Mode, [Cost | Costs], [c(Cost, 0.0-0.0) | BestCells]) :-
     !,
-    xo_best_cell(Mode, Costs, BestCells).
+    xo_best_cell(WinQty, ForkQtyList, Mode, Costs, BestCells).
 
 
 % xo_rate_profile(+Cell_ID, +Cost, +Shape, -Profile)
@@ -1242,8 +1239,8 @@ sum_int_pairs(Pairs, SumPairs) :-
 % sum_int_pairs(Pairs, SumPairs0, SumPairs)
 sum_int_pairs([], SumPairs, SumPairs).
 sum_int_pairs([X1-X2|Xs], Sum01-Sum02, SumPairs) :-
-    plus(Sum01, X1, Sum11),
-    plus(Sum02, X2, Sum12),
+    Sum11 is Sum01 + X1,
+    Sum12 is Sum02 + X2,
     sum_int_pairs(Xs, Sum11-Sum12, SumPairs).
 
 % есть вилка
@@ -1597,5 +1594,4 @@ split_list(List, K, [Sub|Rest]) :-
     length(Sub, K),
     append(Sub, Tail, List),
     split_list(Tail, K, Rest).
-
 
